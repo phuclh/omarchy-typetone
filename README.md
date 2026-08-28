@@ -147,6 +147,8 @@ status and delegates key-event handling and audio playback to Wayvibes.
 
 ## Credits and license
 
+Created by [Phuc Le (@phuclh93)](https://x.com/phuclh93).
+
 TypeTone is built on top of
 [Wayvibes by sahaj-b](https://github.com/sahaj-b/wayvibes), which provides the
 keyboard-event and audio engine. TypeTone provides the Omarchy integration,
