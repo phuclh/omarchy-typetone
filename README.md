@@ -9,6 +9,8 @@ preferred volume for each sound pack. TypeTone does not synthesize keyboard
 audio itself: Wayvibes reads Linux keyboard events and plays recorded sound
 samples.
 
+![TypeTone settings with the sound picker expanded](preview.png)
+
 ## Features
 
 - Global mechanical-keyboard sounds on Wayland through Wayvibes
