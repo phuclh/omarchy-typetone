@@ -1,0 +1,15 @@
+{
+  "id": "typetone-mouse-deep",
+  "name": "TypeTone Mouse — Deep",
+  "key_define_type": "multiple",
+  "includes_numpad": false,
+  "sound": "left.wav",
+  "defines": {
+    "272": "left.wav",
+    "273": "right.wav",
+    "274": "middle.wav",
+    "275": "middle.wav",
+    "276": "middle.wav"
+  },
+  "description": "Original synthesized low mouse clicks by TypeTone"
+}

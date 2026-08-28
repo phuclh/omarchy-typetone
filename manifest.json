@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "io.github.phuclh.typetone",
   "name": "TypeTone",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Phuc Le",
-  "description": "Mechanical keyboard sounds for Omarchy, powered by Wayvibes",
+  "description": "Mechanical keyboard and mouse-click sounds for Omarchy, powered by Wayvibes",
   "kinds": [
     "service",
     "bar-widget"
@@ -16,7 +16,7 @@
   },
   "barWidget": {
     "displayName": "TypeTone",
-    "description": "Toggle keyboard sounds, select a switch pack, and remember its volume",
+    "description": "Control keyboard and mouse sounds with remembered per-pack volume",
     "category": "Audio",
     "allowMultiple": false,
     "defaultSection": "right"

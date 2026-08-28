@@ -1,24 +1,28 @@
 # TypeTone
 
-Mechanical keyboard sounds for the Omarchy desktop, powered by
+Mechanical keyboard and mouse-click sounds for the Omarchy desktop, powered by
 [Wayvibes](https://github.com/sahaj-b/wayvibes).
 
 TypeTone is an Omarchy Quattro service and bar widget. It manages a Wayvibes
-process, provides controls that match the Omarchy shell, and remembers the
-preferred volume for each sound pack. TypeTone does not synthesize keyboard
-audio itself: Wayvibes reads Linux keyboard events and plays recorded sound
-samples.
+processes, provides controls that match the Omarchy shell, and remembers the
+preferred volume for each keyboard and mouse sound pack. TypeTone does not
+synthesize keyboard audio itself: Wayvibes reads Linux input events and plays
+audio samples. The bundled mouse clicks are original sounds synthesized for
+TypeTone.
 
 ![TypeTone settings with the sound picker expanded](preview.png)
 
 ## Features
 
 - Global mechanical-keyboard sounds on Wayland through Wayvibes
+- Left, right, middle, side, and extra mouse-button sounds
+- Automatic mouse and touchpad detection with a device selector
+- Three original mouse-click styles: Crisp, Soft, and Deep
 - Omarchy bar control with click-to-toggle and right-click settings
 - Scrollable selector for 20 upstream sound packs
-- Independent volume memory for every sound pack
+- Independent volume memory for every keyboard and mouse sound pack
 - Mouse-wheel volume control from the bar
-- Persistent enabled state, selected pack, device override, and volume profiles
+- Separate keyboard and mouse toggles, packs, devices, and volume profiles
 - Automatic Wayvibes process lifecycle and visible error/status feedback
 - No network access or telemetry in the TypeTone plugin
 
@@ -28,7 +32,8 @@ samples.
 - [Wayvibes](https://github.com/sahaj-b/wayvibes)
 - A Wayvibes-compatible sound-pack collection at
   `~/.local/share/wayvibes/soundpacks`
-- Permission to read the selected keyboard through Linux `evdev`
+- Permission to read the selected keyboard and pointing device through Linux
+  `evdev`
 
 Wayvibes and its sound packs are external dependencies. They are not included
 in this repository and are not covered by TypeTone's license. See
@@ -44,7 +49,8 @@ From an Omarchy terminal:
 omarchy pkg aur add wayvibes-git
 ```
 
-Your user must be in the `input` group so Wayvibes can read keyboard events:
+Your user must be in the `input` group so Wayvibes can read keyboard and mouse
+events:
 
 ```bash
 sudo usermod -aG input "$USER"
@@ -86,18 +92,35 @@ its settings file.
 omarchy plugin add https://github.com/phuclh/omarchy-typetone.git --enable
 ```
 
-TypeTone appears on the right side of the Omarchy bar by default.
+TypeTone appears on the right side of the Omarchy bar by default. Existing
+installations keep mouse sounds disabled until they are turned on from the
+Mouse tab.
 
 ## Use
 
 - **Left-click TypeTone:** enable or disable keyboard sounds
 - **Right-click TypeTone:** open sound, volume, status, and restart controls
 - **Mouse wheel over TypeTone:** adjust the current sound's volume
-- **Sound selector:** open or close the inline list and choose a pack
+- **Keyboard tab:** choose a switch pack and its volume
+- **Mouse tab:** enable mouse clicks, select a mouse or touchpad, choose a click
+  style, and adjust its volume
 
-Each pack starts with the current volume the first time it is selected. After
-you adjust it once, TypeTone restores that pack's own level whenever you return
-to it.
+Each keyboard or mouse pack starts with the current volume the first time it is
+selected. After you adjust it once, TypeTone restores that pack's own level
+whenever you return to it.
+
+## Mouse-click sounds
+
+Wayvibes officially targets keyboards, but its audio loop can map any Linux
+`EV_KEY` button code to a sample. TypeTone runs a second isolated Wayvibes
+process for the selected pointing device and maps the standard left, right,
+middle, side, and extra button codes. Keyboard behavior and Wayvibes' saved
+keyboard selection remain independent.
+
+The Crisp, Soft, and Deep mouse packs are synthesized TypeTone assets rather
+than third-party recordings. Their reproducible source is
+[`tools/generate-mouse-sounds.sh`](tools/generate-mouse-sounds.sh); `ffmpeg` is
+needed only to regenerate the WAV files, not to use TypeTone.
 
 ## Configuration
 
@@ -107,10 +130,12 @@ TypeTone stores user settings at:
 ~/.config/wayvibes/omarchy.json
 ```
 
-The `packVolumes` object contains the remembered level for each pack. The
-top-level `volume` remains as the current/legacy value. An empty `deviceName`
-uses the keyboard selected by Wayvibes; set it to an exact evdev device name to
-override that selection.
+The `packVolumes` and `mousePackVolumes` objects contain the remembered levels
+for keyboard and mouse packs. The top-level `volume` and `mouseVolume` values
+are the current selections. An empty `deviceName` uses the keyboard selected
+by Wayvibes; set it to an exact evdev device name to override that selection.
+TypeTone resolves `mouseDeviceName` to its current `/dev/input/event*` path on
+every scan, so normal event-number changes do not invalidate the selection.
 
 Service status is available over Omarchy shell IPC:
 
@@ -137,13 +162,15 @@ application uses them.
 ## Security and privacy
 
 Omarchy plugins run as unsandboxed user code. TypeTone starts and stops the
-`wayvibes` executable, reads and writes only its settings file, and does not
-make network requests. Wayvibes requires global access to keyboard events via
+`wayvibes` executable, reads Linux keyboard and pointing-device events, writes
+its settings plus an isolated Wayvibes mouse-device selection, and does not
+make network requests. Wayvibes requires global access to input events via
 `evdev`; do not run it as root. Review the Wayvibes source and use only sound
 packs you trust.
 
-TypeTone does not store typed text or key-event history. It reacts to process
-status and delegates key-event handling and audio playback to Wayvibes.
+TypeTone does not store typed text, pointer movement, clicks, or input-event
+history. It reacts to process status and delegates input-event handling and
+audio playback to Wayvibes.
 
 ## Credits and license
 
@@ -152,7 +179,8 @@ Created by [Phuc Le (@phuclh93)](https://x.com/phuclh93).
 TypeTone is built on top of
 [Wayvibes by sahaj-b](https://github.com/sahaj-b/wayvibes), which provides the
 keyboard-event and audio engine. TypeTone provides the Omarchy integration,
-controls, persistence, and per-pack volume profiles.
+controls, mouse-device adapter, original mouse sounds, persistence, and
+per-pack volume profiles.
 
 TypeTone's original source code and documentation are released under the
 [MIT License](LICENSE). External software and sound recordings remain under

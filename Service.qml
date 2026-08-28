@@ -12,6 +12,10 @@ Item {
   readonly property string homeDir: Quickshell.env("HOME")
   readonly property string settingsPath: homeDir + "/.config/wayvibes/omarchy.json"
   readonly property string soundpacksRoot: homeDir + "/.local/share/wayvibes/soundpacks"
+  readonly property string mouseSoundpacksRoot: resolvedLocalPath("mouse-sounds")
+  readonly property string mouseDeviceListScript: resolvedLocalPath("scripts/list-pointing-devices.sh")
+  readonly property string mouseRunnerScript: resolvedLocalPath("scripts/run-mouse-wayvibes.sh")
+  readonly property string mouseConfigHome: homeDir + "/.config/wayvibes/typetone-mouse"
 
   property bool settingsLoaded: false
   property bool soundsEnabled: true
@@ -19,14 +23,35 @@ Item {
   property real volume: 1.0
   property var packVolumes: ({})
   property string deviceName: ""
+  property bool mouseEnabled: false
+  property string mousePack: "crisp"
+  property real mouseVolume: 0.75
+  property var mousePackVolumes: ({})
+  property string mouseDeviceName: ""
+  property var mouseDeviceOptions: []
+  property bool mouseScanPending: false
+  property string mouseLastMessage: "Mouse sounds are off"
+  property string mouseLastError: ""
   property string lastMessage: "Loading settings…"
   property string lastError: ""
   property bool restartPending: false
+  property bool mouseRestartPending: false
 
   readonly property bool running: wayvibesProcess.running
-  readonly property string statusLabel: running
+  readonly property bool mouseRunning: mouseWayvibesProcess.running
+  readonly property string mouseDevicePath: pathForMouseDevice(mouseDeviceName)
+  readonly property string keyboardStatusLabel: running
     ? (deviceName !== "" ? "Listening on " + deviceName : "Listening for keyboard events")
     : (soundsEnabled ? "Starting…" : "Keyboard sounds are off")
+  readonly property string mouseStatusLabel: mouseRunning
+    ? "Listening on " + currentMouseDeviceLabel()
+    : (mouseEnabled
+      ? (mouseDeviceOptions.length > 0 ? "Starting mouse sounds…" : "No pointing device found")
+      : "Mouse sounds are off")
+  readonly property string statusLabel: running && mouseRunning
+    ? "Keyboard and mouse sounds active"
+    : (running ? keyboardStatusLabel : (mouseRunning ? mouseStatusLabel
+      : ((soundsEnabled || mouseEnabled) ? "Starting TypeTone…" : "All sounds are off")))
 
   readonly property var packOptions: [
     { value: "nk-cream", label: "NK Cream" },
@@ -51,6 +76,18 @@ Item {
     { value: "topre-purple-hybrid-pbt", label: "Topre Purple Hybrid — PBT" }
   ]
 
+  readonly property var mousePackOptions: [
+    { value: "crisp", label: "Crisp" },
+    { value: "soft", label: "Soft" },
+    { value: "deep", label: "Deep" }
+  ]
+
+  function resolvedLocalPath(relativePath) {
+    var value = String(Qt.resolvedUrl(relativePath))
+    if (value.indexOf("file://") === 0) return decodeURIComponent(value.substring(7))
+    return value
+  }
+
   function isKnownPack(name) {
     for (var i = 0; i < packOptions.length; i++) {
       if (String(packOptions[i].value) === String(name)) return true
@@ -58,8 +95,35 @@ Item {
     return false
   }
 
+  function isKnownMousePack(name) {
+    for (var i = 0; i < mousePackOptions.length; i++) {
+      if (String(mousePackOptions[i].value) === String(name)) return true
+    }
+    return false
+  }
+
   function packPath(name) {
     return soundpacksRoot + "/" + name
+  }
+
+  function mousePackPath(name) {
+    return mouseSoundpacksRoot + "/" + name
+  }
+
+  function pathForMouseDevice(name) {
+    for (var i = 0; i < mouseDeviceOptions.length; i++) {
+      if (String(mouseDeviceOptions[i].value) === String(name))
+        return String(mouseDeviceOptions[i].path || "")
+    }
+    return ""
+  }
+
+  function currentMouseDeviceLabel() {
+    for (var i = 0; i < mouseDeviceOptions.length; i++) {
+      if (String(mouseDeviceOptions[i].value) === String(mouseDeviceName))
+        return String(mouseDeviceOptions[i].label || mouseDeviceName)
+    }
+    return mouseDeviceName !== "" ? mouseDeviceName : "pointing device"
   }
 
   function clampVolume(value) {
@@ -74,6 +138,18 @@ Item {
 
     for (var i = 0; i < root.packOptions.length; i++) {
       var name = String(root.packOptions[i].value)
+      if (raw[name] === undefined || !isFinite(Number(raw[name]))) continue
+      cleaned[name] = root.clampVolume(raw[name])
+    }
+    return cleaned
+  }
+
+  function sanitizedMousePackVolumes(raw) {
+    var cleaned = {}
+    if (!raw || typeof raw !== "object") return cleaned
+
+    for (var i = 0; i < root.mousePackOptions.length; i++) {
+      var name = String(root.mousePackOptions[i].value)
       if (raw[name] === undefined || !isFinite(Number(raw[name]))) continue
       cleaned[name] = root.clampVolume(raw[name])
     }
@@ -98,6 +174,24 @@ Item {
     root.packVolumes = updated
   }
 
+  function hasSavedMousePackVolume(name) {
+    return root.mousePackVolumes
+      && root.mousePackVolumes[String(name)] !== undefined
+      && isFinite(Number(root.mousePackVolumes[String(name)]))
+  }
+
+  function savedVolumeForMousePack(name, fallback) {
+    return root.hasSavedMousePackVolume(name)
+      ? root.clampVolume(root.mousePackVolumes[String(name)])
+      : root.clampVolume(fallback)
+  }
+
+  function rememberMousePackVolume(name, value) {
+    var updated = root.sanitizedMousePackVolumes(root.mousePackVolumes)
+    updated[String(name)] = root.clampVolume(value)
+    root.mousePackVolumes = updated
+  }
+
   function applySettings(raw) {
     var parsed = null
     try {
@@ -115,11 +209,25 @@ Item {
     root.volume = root.savedVolumeForPack(root.pack, legacyVolume)
     root.rememberPackVolume(root.pack, root.volume)
     root.deviceName = String(parsed.deviceName || "")
+
+    root.mouseEnabled = parsed.mouseEnabled === undefined ? false : !!parsed.mouseEnabled
+    root.mousePack = root.isKnownMousePack(parsed.mousePack) ? String(parsed.mousePack) : "crisp"
+    root.mousePackVolumes = root.sanitizedMousePackVolumes(parsed.mousePackVolumes)
+    var legacyMouseVolume = root.clampVolume(
+      parsed.mouseVolume === undefined ? 0.75 : parsed.mouseVolume)
+    var selectedMousePackHadProfile = root.hasSavedMousePackVolume(root.mousePack)
+    root.mouseVolume = root.savedVolumeForMousePack(root.mousePack, legacyMouseVolume)
+    root.rememberMousePackVolume(root.mousePack, root.mouseVolume)
+    root.mouseDeviceName = String(parsed.mouseDeviceName || "")
     root.settingsLoaded = true
     root.lastMessage = root.soundsEnabled ? "Starting Wayvibes…" : "Keyboard sounds are off"
+    root.mouseLastMessage = root.mouseEnabled ? "Finding pointing devices…" : "Mouse sounds are off"
 
-    if (!selectedPackHadProfile) settingsMigrationTimer.restart()
+    if (!selectedPackHadProfile || !selectedMousePackHadProfile
+        || parsed.mouseEnabled === undefined || parsed.mouseDeviceName === undefined)
+      settingsMigrationTimer.restart()
     if (root.soundsEnabled) startTimer.restart()
+    root.rescanMouseDevices()
   }
 
   function persistSettings() {
@@ -129,7 +237,12 @@ Item {
       pack: root.pack,
       volume: root.volume,
       packVolumes: root.packVolumes,
-      deviceName: root.deviceName
+      deviceName: root.deviceName,
+      mouseEnabled: root.mouseEnabled,
+      mousePack: root.mousePack,
+      mouseVolume: root.mouseVolume,
+      mousePackVolumes: root.mousePackVolumes,
+      mouseDeviceName: root.mouseDeviceName
     }, null, 2) + "\n")
   }
 
@@ -172,6 +285,106 @@ Item {
     root.requestRestart()
   }
 
+  function setMouseEnabled(value) {
+    var next = !!value
+    if (root.mouseEnabled === next) return
+    root.mouseEnabled = next
+    root.persistSettings()
+    if (next) {
+      root.mouseLastMessage = "Finding pointing devices…"
+      if (root.mouseDeviceOptions.length === 0) root.rescanMouseDevices()
+      else mouseStartTimer.restart()
+    } else {
+      root.stopMouse()
+    }
+  }
+
+  function toggleMouse() {
+    root.setMouseEnabled(!root.mouseEnabled)
+  }
+
+  function setMousePack(name) {
+    var next = String(name || "")
+    if (!root.isKnownMousePack(next) || root.mousePack === next) return
+
+    var fallbackVolume = root.mouseVolume
+    root.rememberMousePackVolume(root.mousePack, root.mouseVolume)
+    root.mousePack = next
+    root.mouseVolume = root.savedVolumeForMousePack(next, fallbackVolume)
+    root.rememberMousePackVolume(next, root.mouseVolume)
+    root.persistSettings()
+    root.requestMouseRestart()
+  }
+
+  function setMouseVolume(value) {
+    var next = root.clampVolume(value)
+    if (Math.abs(root.mouseVolume - next) < 0.001) return
+    root.mouseVolume = next
+    root.rememberMousePackVolume(root.mousePack, next)
+    root.persistSettings()
+    root.requestMouseRestart()
+  }
+
+  function setMouseDevice(name) {
+    var next = String(name || "")
+    if (root.pathForMouseDevice(next) === "" || root.mouseDeviceName === next) return
+    root.mouseDeviceName = next
+    root.persistSettings()
+    root.requestMouseRestart()
+  }
+
+  function rescanMouseDevices() {
+    if (mouseDeviceScanProcess.running) return
+    root.mouseScanPending = true
+    root.mouseLastError = ""
+    root.mouseLastMessage = "Finding pointing devices…"
+    mouseDeviceScanProcess.running = true
+  }
+
+  function applyMouseDeviceScan(raw) {
+    var candidates = []
+    var seen = ({})
+    var lines = String(raw || "").split("\n")
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = String(lines[i] || "").trim()
+      if (line === "") continue
+      var fields = line.split("\t")
+      if (fields.length < 2) continue
+      var path = String(fields.shift() || "")
+      var name = String(fields.join("\t") || "")
+      if (path === "" || name === "" || seen[name]) continue
+      seen[name] = true
+      candidates.push({ value: name, label: name, path: path })
+    }
+
+    var previousName = root.mouseDeviceName
+    var savedDeviceStillAvailable = false
+    for (var j = 0; j < candidates.length; j++) {
+      if (String(candidates[j].value) === previousName) {
+        savedDeviceStillAvailable = true
+        break
+      }
+    }
+
+    root.mouseDeviceOptions = candidates
+    if (!savedDeviceStillAvailable)
+      root.mouseDeviceName = candidates.length > 0 ? String(candidates[0].value) : ""
+    root.mouseScanPending = false
+
+    if (root.mouseDeviceName !== previousName) root.persistSettings()
+
+    if (candidates.length === 0) {
+      root.stopMouse()
+      root.mouseLastMessage = "No mouse or touchpad found"
+      root.mouseLastError = "No click-capable pointing device was detected."
+      return
+    }
+
+    root.mouseLastMessage = root.mouseEnabled ? "Starting mouse sounds…" : "Mouse sounds are off"
+    if (root.mouseEnabled) root.requestMouseRestart()
+  }
+
   function requestRestart() {
     if (!root.soundsEnabled) return
     root.lastMessage = "Applying Wayvibes settings…"
@@ -189,6 +402,25 @@ Item {
       return
     }
     root.requestRestart()
+  }
+
+  function requestMouseRestart() {
+    if (!root.mouseEnabled) return
+    root.mouseLastMessage = "Applying mouse sound settings…"
+    if (mouseWayvibesProcess.running) {
+      root.mouseRestartPending = true
+      mouseWayvibesProcess.running = false
+    } else {
+      mouseStartTimer.restart()
+    }
+  }
+
+  function restartMouse() {
+    if (!root.mouseEnabled) {
+      root.setMouseEnabled(true)
+      return
+    }
+    root.requestMouseRestart()
   }
 
   function start() {
@@ -213,6 +445,34 @@ Item {
     root.lastError = ""
   }
 
+  function startMouse() {
+    if (!root.settingsLoaded || !root.mouseEnabled || mouseWayvibesProcess.running) return
+    if (root.mouseDevicePath === "") {
+      root.rescanMouseDevices()
+      return
+    }
+
+    root.mouseRestartPending = false
+    root.mouseLastError = ""
+    root.mouseLastMessage = "Starting mouse sounds…"
+    mouseWayvibesProcess.command = [
+      root.mouseRunnerScript,
+      root.mouseConfigHome,
+      root.mouseDevicePath,
+      root.mousePackPath(root.mousePack),
+      String(root.mouseVolume)
+    ]
+    mouseWayvibesProcess.running = true
+  }
+
+  function stopMouse() {
+    root.mouseRestartPending = false
+    mouseStartTimer.stop()
+    if (mouseWayvibesProcess.running) mouseWayvibesProcess.running = false
+    root.mouseLastMessage = "Mouse sounds are off"
+    root.mouseLastError = ""
+  }
+
   function handleOutput(data) {
     var message = String(data || "").trim()
     if (!message) return
@@ -233,6 +493,13 @@ Item {
     interval: 180
     repeat: false
     onTriggered: root.start()
+  }
+
+  Timer {
+    id: mouseStartTimer
+    interval: 180
+    repeat: false
+    onTriggered: root.startMouse()
   }
 
   Timer {
@@ -275,8 +542,71 @@ Item {
     }
   }
 
+  Process {
+    id: mouseDeviceScanProcess
+    command: [root.mouseDeviceListScript]
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.applyMouseDeviceScan(text)
+    }
+
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var message = String(text || "").trim()
+        if (message !== "") root.mouseLastError = message
+      }
+    }
+
+    onExited: function(exitCode) {
+      if (exitCode === 0) return
+      root.mouseScanPending = false
+      if (root.mouseLastError === "")
+        root.mouseLastError = "Could not scan pointing devices (exit " + exitCode + ")."
+    }
+  }
+
+  Process {
+    id: mouseWayvibesProcess
+
+    stdout: SplitParser {
+      onRead: function(data) {
+        var message = String(data || "").trim()
+        if (message !== "") root.mouseLastMessage = message
+      }
+    }
+
+    stderr: SplitParser {
+      onRead: function(data) {
+        var message = String(data || "").trim()
+        if (message === "") return
+        root.mouseLastError = message
+        root.mouseLastMessage = message
+      }
+    }
+
+    onRunningChanged: {
+      if (running) root.mouseLastMessage = "Wayvibes is listening for mouse clicks"
+    }
+
+    onExited: function(exitCode) {
+      if (root.mouseRestartPending && root.mouseEnabled) {
+        root.mouseRestartPending = false
+        mouseStartTimer.restart()
+        return
+      }
+
+      if (!root.mouseEnabled) return
+      if (!root.mouseLastError)
+        root.mouseLastError = "Mouse Wayvibes stopped unexpectedly (exit " + exitCode + ")."
+    }
+  }
+
   Component.onDestruction: {
     if (wayvibesProcess.running) wayvibesProcess.running = false
+    if (mouseWayvibesProcess.running) mouseWayvibesProcess.running = false
+    if (mouseDeviceScanProcess.running) mouseDeviceScanProcess.running = false
   }
 
   IpcHandler {
@@ -290,6 +620,16 @@ Item {
         volume: root.volume,
         packVolumes: root.packVolumes,
         deviceName: root.deviceName,
+        mouseEnabled: root.mouseEnabled,
+        mouseRunning: root.mouseRunning,
+        mousePack: root.mousePack,
+        mouseVolume: root.mouseVolume,
+        mousePackVolumes: root.mousePackVolumes,
+        mouseDeviceName: root.mouseDeviceName,
+        mouseDevicePath: root.mouseDevicePath,
+        mouseDevices: root.mouseDeviceOptions,
+        mouseMessage: root.mouseLastMessage,
+        mouseError: root.mouseLastError,
         message: root.lastMessage,
         error: root.lastError
       })
@@ -314,6 +654,32 @@ Item {
     function restart(): string {
       root.restart()
       return "restarting"
+    }
+
+    function enableMouse(): string {
+      root.setMouseEnabled(true)
+      return "enabled"
+    }
+
+    function disableMouse(): string {
+      root.setMouseEnabled(false)
+      return "disabled"
+    }
+
+    function toggleMouse(): string {
+      var enabling = !root.mouseEnabled
+      root.setMouseEnabled(enabling)
+      return enabling ? "enabled" : "disabled"
+    }
+
+    function restartMouse(): string {
+      root.restartMouse()
+      return "restarting"
+    }
+
+    function rescanMouseDevices(): string {
+      root.rescanMouseDevices()
+      return "scanning"
     }
   }
 }

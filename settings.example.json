@@ -5,5 +5,12 @@
   "packVolumes": {
     "nk-cream": 1
   },
-  "deviceName": ""
+  "deviceName": "",
+  "mouseEnabled": false,
+  "mousePack": "crisp",
+  "mouseVolume": 0.75,
+  "mousePackVolumes": {
+    "crisp": 0.75
+  },
+  "mouseDeviceName": ""
 }
