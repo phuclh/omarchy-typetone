@@ -24,6 +24,7 @@ recordings and work offline.
 - Independent volume memory for every keyboard and mouse sound pack
 - Mouse-wheel volume control from the bar
 - Separate keyboard and mouse toggles, packs, devices, and volume profiles
+- Guided one-command setup for Wayvibes, sound packs, permissions, and TypeTone
 - Automatic Wayvibes process lifecycle and visible error/status feedback
 - No network access or telemetry in the TypeTone plugin
 
@@ -43,7 +44,25 @@ bundled mouse recordings use CC0; see
 
 ## Install
 
-### 1. Install Wayvibes
+### Guided setup
+
+Paste this one command into an Omarchy terminal:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/phuclh/omarchy-typetone/main/install.sh)
+```
+
+The installer explains each action and asks before making changes. It installs
+Wayvibes, grants input-device access, downloads the keyboard sound packs,
+selects a detected keyboard, and installs TypeTone from GitHub. If it adds your
+user to the `input` group, log out and back in once when it finishes.
+
+Review [`install.sh`](install.sh) before running it. Omarchy plugins and this
+installer run as unsandboxed user code.
+
+### Manual setup
+
+#### 1. Install Wayvibes
 
 From an Omarchy terminal:
 
@@ -60,7 +79,7 @@ sudo usermod -aG input "$USER"
 
 Log out and back in after changing group membership.
 
-### 2. Download the upstream sound packs
+#### 2. Download the upstream sound packs
 
 For a new installation, use a sparse clone so only the `soundpacks` directory
 is checked out:
@@ -75,7 +94,7 @@ git -C "$HOME/.local/share/wayvibes" sparse-checkout set soundpacks
 If `~/.local/share/wayvibes` already exists, keep it and place compatible packs
 inside its `soundpacks` directory instead of running the clone command.
 
-### 3. Select a keyboard once
+#### 3. Select a keyboard once
 
 Run Wayvibes interactively before enabling TypeTone:
 
@@ -88,7 +107,7 @@ the selection. Users of `keyd` or another remapper should normally select its
 virtual keyboard. TypeTone also supports an explicit `deviceName` override in
 its settings file.
 
-### 4. Install TypeTone
+#### 4. Install TypeTone
 
 ```bash
 omarchy plugin add https://github.com/phuclh/omarchy-typetone.git --enable
