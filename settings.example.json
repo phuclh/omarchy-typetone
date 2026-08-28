@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "pack": "nk-cream",
+  "volume": 1,
+  "packVolumes": {
+    "nk-cream": 1
+  },
+  "deviceName": ""
+}
