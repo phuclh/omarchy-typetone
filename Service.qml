@@ -19,11 +19,13 @@ Item {
 
   property bool settingsLoaded: false
   property bool soundsEnabled: true
+  property bool resumeKeyboardEnabled: true
   property string pack: "nk-cream"
   property real volume: 1.0
   property var packVolumes: ({})
   property string deviceName: ""
   property bool mouseEnabled: false
+  property bool resumeMouseEnabled: false
   property string mousePack: "crisp"
   property real mouseVolume: 0.75
   property var mousePackVolumes: ({})
@@ -39,6 +41,7 @@ Item {
 
   readonly property bool running: wayvibesProcess.running
   readonly property bool mouseRunning: mouseWayvibesProcess.running
+  readonly property bool masterMuted: !soundsEnabled && !mouseEnabled
   readonly property string mouseDevicePath: pathForMouseDevice(mouseDeviceName)
   readonly property string keyboardStatusLabel: running
     ? (deviceName !== "" ? "Listening on " + deviceName : "Listening for keyboard events")
@@ -222,12 +225,25 @@ Item {
     root.mouseVolume = root.savedVolumeForMousePack(root.mousePack, legacyMouseVolume)
     root.rememberMousePackVolume(root.mousePack, root.mouseVolume)
     root.mouseDeviceName = String(parsed.mouseDeviceName || "")
+    if (root.soundsEnabled || root.mouseEnabled) {
+      root.resumeKeyboardEnabled = root.soundsEnabled
+      root.resumeMouseEnabled = root.mouseEnabled
+    } else {
+      root.resumeKeyboardEnabled = parsed.resumeKeyboardEnabled === undefined
+        ? true : !!parsed.resumeKeyboardEnabled
+      root.resumeMouseEnabled = parsed.resumeMouseEnabled === undefined
+        ? false : !!parsed.resumeMouseEnabled
+      if (!root.resumeKeyboardEnabled && !root.resumeMouseEnabled)
+        root.resumeKeyboardEnabled = true
+    }
     root.settingsLoaded = true
     root.lastMessage = root.soundsEnabled ? "Starting Wayvibes…" : "Keyboard sounds are off"
     root.mouseLastMessage = root.mouseEnabled ? "Finding pointing devices…" : "Mouse sounds are off"
 
     if (!selectedPackHadProfile || !selectedMousePackHadProfile
-        || parsed.mouseEnabled === undefined || parsed.mouseDeviceName === undefined)
+        || parsed.mouseEnabled === undefined || parsed.mouseDeviceName === undefined
+        || parsed.resumeKeyboardEnabled === undefined
+        || parsed.resumeMouseEnabled === undefined)
       settingsMigrationTimer.restart()
     if (root.soundsEnabled) startTimer.restart()
     root.rescanMouseDevices()
@@ -237,11 +253,13 @@ Item {
     if (!root.settingsLoaded) return
     settingsFile.setText(JSON.stringify({
       enabled: root.soundsEnabled,
+      resumeKeyboardEnabled: root.resumeKeyboardEnabled,
       pack: root.pack,
       volume: root.volume,
       packVolumes: root.packVolumes,
       deviceName: root.deviceName,
       mouseEnabled: root.mouseEnabled,
+      resumeMouseEnabled: root.resumeMouseEnabled,
       mousePack: root.mousePack,
       mouseVolume: root.mouseVolume,
       mousePackVolumes: root.mousePackVolumes,
@@ -250,20 +268,56 @@ Item {
   }
 
   function setEnabled(value) {
-    var next = !!value
-    if (root.soundsEnabled === next) return
-    root.soundsEnabled = next
+    root.setEnabledStates(!!value, root.mouseEnabled, true)
+  }
+
+  function setEnabledStates(keyboardValue, mouseValue, rememberCombination) {
+    var nextKeyboard = !!keyboardValue
+    var nextMouse = !!mouseValue
+    var keyboardChanged = root.soundsEnabled !== nextKeyboard
+    var mouseChanged = root.mouseEnabled !== nextMouse
+    if (!keyboardChanged && !mouseChanged) return
+
+    root.soundsEnabled = nextKeyboard
+    root.mouseEnabled = nextMouse
+    if (rememberCombination && (nextKeyboard || nextMouse)) {
+      root.resumeKeyboardEnabled = nextKeyboard
+      root.resumeMouseEnabled = nextMouse
+    }
     root.persistSettings()
-    if (next) {
+
+    if (keyboardChanged && nextKeyboard) {
       root.lastMessage = "Starting Wayvibes…"
       startTimer.restart()
-    } else {
+    } else if (keyboardChanged) {
       root.stop()
+    }
+
+    if (mouseChanged && nextMouse) {
+      root.mouseLastMessage = "Finding pointing devices…"
+      if (root.mouseDeviceOptions.length === 0) root.rescanMouseDevices()
+      else mouseStartTimer.restart()
+    } else if (mouseChanged) {
+      root.stopMouse()
     }
   }
 
   function toggle() {
     root.setEnabled(!root.soundsEnabled)
+  }
+
+  function toggleMaster() {
+    if (!root.masterMuted) {
+      root.resumeKeyboardEnabled = root.soundsEnabled
+      root.resumeMouseEnabled = root.mouseEnabled
+      root.setEnabledStates(false, false, false)
+      return
+    }
+
+    var restoreKeyboard = root.resumeKeyboardEnabled
+    var restoreMouse = root.resumeMouseEnabled
+    if (!restoreKeyboard && !restoreMouse) restoreKeyboard = true
+    root.setEnabledStates(restoreKeyboard, restoreMouse, false)
   }
 
   function setPack(name) {
@@ -289,17 +343,7 @@ Item {
   }
 
   function setMouseEnabled(value) {
-    var next = !!value
-    if (root.mouseEnabled === next) return
-    root.mouseEnabled = next
-    root.persistSettings()
-    if (next) {
-      root.mouseLastMessage = "Finding pointing devices…"
-      if (root.mouseDeviceOptions.length === 0) root.rescanMouseDevices()
-      else mouseStartTimer.restart()
-    } else {
-      root.stopMouse()
-    }
+    root.setEnabledStates(root.soundsEnabled, !!value, true)
   }
 
   function toggleMouse() {
@@ -618,12 +662,15 @@ Item {
     function status(): string {
       return JSON.stringify({
         enabled: root.soundsEnabled,
+        masterMuted: root.masterMuted,
+        resumeKeyboardEnabled: root.resumeKeyboardEnabled,
         running: root.running,
         pack: root.pack,
         volume: root.volume,
         packVolumes: root.packVolumes,
         deviceName: root.deviceName,
         mouseEnabled: root.mouseEnabled,
+        resumeMouseEnabled: root.resumeMouseEnabled,
         mouseRunning: root.mouseRunning,
         mousePack: root.mousePack,
         mouseVolume: root.mouseVolume,
@@ -652,6 +699,12 @@ Item {
       var enabling = !root.soundsEnabled
       root.setEnabled(enabling)
       return enabling ? "enabled" : "disabled"
+    }
+
+    function toggleAll(): string {
+      var unmuting = root.masterMuted
+      root.toggleMaster()
+      return unmuting ? "enabled" : "disabled"
     }
 
     function restart(): string {

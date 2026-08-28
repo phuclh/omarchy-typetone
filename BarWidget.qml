@@ -13,7 +13,6 @@ BarWidget {
   readonly property bool mouseEnabled: wayvibesService ? wayvibesService.mouseEnabled : false
   readonly property bool mouseRunning: wayvibesService ? wayvibesService.mouseRunning : false
   readonly property bool anySoundsEnabled: soundsEnabled || mouseEnabled
-  readonly property bool anySoundsRunning: soundsRunning || mouseRunning
   readonly property var packOptions: wayvibesService ? wayvibesService.packOptions : []
   readonly property var mousePackOptions: wayvibesService ? wayvibesService.mousePackOptions : []
   readonly property var mouseDeviceOptions: wayvibesService ? wayvibesService.mouseDeviceOptions : []
@@ -144,36 +143,22 @@ BarWidget {
 
   onPopupOpenChanged: if (!popupOpen) closePickers()
 
-  implicitWidth: content.implicitWidth + Style.space(14)
+  implicitWidth: statusIcon.implicitWidth + Style.space(14)
   implicitHeight: barSize
 
-  Row {
-    id: content
+  Text {
+    id: statusIcon
     anchors.centerIn: parent
-    spacing: Style.space(6)
+    text: root.anySoundsEnabled ? "󰌌" : "󰌐"
+    color: root.anySoundsEnabled
+      ? root.bar.barForeground
+      : Qt.darker(root.bar.barForeground, 1.9)
+    font.family: root.bar.fontFamily
+    font.pixelSize: Style.font.icon
 
-    Text {
-      anchors.verticalCenter: parent.verticalCenter
-      text: "󰌌"
-      color: root.anySoundsRunning
-        ? root.bar.barForeground
-        : Qt.darker(root.bar.barForeground, 1.7)
-      font.family: root.bar.fontFamily
-      font.pixelSize: Style.font.icon
-
-      Behavior on color {
-        enabled: !root.bar || root.bar.foregroundAnimationEnabled
-        ColorAnimation { duration: 140 }
-      }
-    }
-
-    Text {
-      anchors.verticalCenter: parent.verticalCenter
-      visible: !root.vertical
-      text: root.anySoundsEnabled ? "TypeTone" : "TypeTone off"
-      color: root.bar.barForeground
-      font.family: root.bar.fontFamily
-      font.pixelSize: Style.font.bodySmall
+    Behavior on color {
+      enabled: !root.bar || root.bar.foregroundAnimationEnabled
+      ColorAnimation { duration: 140 }
     }
   }
 
@@ -185,21 +170,25 @@ BarWidget {
 
     onClicked: function(mouse) {
       if (!root.wayvibesService) return
-      if (mouse.button === Qt.RightButton) root.popupOpen = !root.popupOpen
-      else root.wayvibesService.toggle()
+      if (mouse.button === Qt.LeftButton) root.popupOpen = !root.popupOpen
+      else root.wayvibesService.toggleMaster()
     }
 
     onWheel: function(wheel) {
       if (!root.wayvibesService) return
       var delta = wheel.angleDelta.y > 0 ? 0.1 : -0.1
-      root.wayvibesService.setVolume(root.wayvibesService.volume + delta)
+      if (root.settingsPage === "mouse")
+        root.wayvibesService.setMouseVolume(root.wayvibesService.mouseVolume + delta)
+      else
+        root.wayvibesService.setVolume(root.wayvibesService.volume + delta)
     }
 
     onEntered: if (root.bar) root.bar.showTooltip(
       root,
       (root.soundsEnabled ? "Keyboard sounds on" : "Keyboard sounds off")
         + (root.mouseEnabled ? " · Mouse sounds on" : " · Mouse sounds off")
-        + " · Left-click keyboard toggle · Right-click settings"
+        + " · Left-click settings · Right-click "
+        + (root.anySoundsEnabled ? "mute all" : "restore sounds")
     )
     onExited: if (root.bar) root.bar.hideTooltip(root)
   }

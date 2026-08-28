@@ -24,6 +24,7 @@ recordings and work offline.
 - Independent volume memory for every keyboard and mouse sound pack
 - Mouse-wheel volume control from the bar
 - Separate keyboard and mouse toggles, packs, devices, and volume profiles
+- Icon-only bar control with a master mute that restores the previous toggles
 - Guided one-command setup for Wayvibes, sound packs, permissions, and TypeTone
 - Automatic Wayvibes process lifecycle and visible error/status feedback
 - No network access or telemetry in the TypeTone plugin
@@ -119,8 +120,9 @@ Mouse tab.
 
 ## Use
 
-- **Left-click TypeTone:** enable or disable keyboard sounds
-- **Right-click TypeTone:** open sound, volume, status, and restart controls
+- **Left-click TypeTone:** open sound, volume, status, and restart controls
+- **Right-click TypeTone:** mute both sound sources or restore their previous
+  keyboard/mouse combination
 - **Mouse wheel over TypeTone:** adjust the current sound's volume
 - **Keyboard tab:** choose a switch pack and its volume
 - **Mouse tab:** enable mouse clicks, select a mouse or touchpad, choose a click
@@ -163,6 +165,8 @@ are the current selections. An empty `deviceName` uses the keyboard selected
 by Wayvibes; set it to an exact evdev device name to override that selection.
 TypeTone resolves `mouseDeviceName` to its current `/dev/input/event*` path on
 every scan, so normal event-number changes do not invalidate the selection.
+The `resumeKeyboardEnabled` and `resumeMouseEnabled` values remember which
+sources a right-click should restore after master mute.
 
 Service status is available over Omarchy shell IPC:
 

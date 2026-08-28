@@ -1,5 +1,6 @@
 {
   "enabled": true,
+  "resumeKeyboardEnabled": true,
   "pack": "nk-cream",
   "volume": 1,
   "packVolumes": {
@@ -7,6 +8,7 @@
   },
   "deviceName": "",
   "mouseEnabled": false,
+  "resumeMouseEnabled": false,
   "mousePack": "crisp",
   "mouseVolume": 0.75,
   "mousePackVolumes": {

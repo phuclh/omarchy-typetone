@@ -14,7 +14,7 @@ identified separately below.
 
 TypeTone starts the `wayvibes` executable but does not copy or modify its
 source. Review the upstream project and its terms before installing, using, or
-redistributing it. At the time of TypeTone 1.2.1, the upstream repository does
+redistributing it. At the time of TypeTone 1.3.0, the upstream repository does
 not expose a root license file.
 
 ## Sound packs
