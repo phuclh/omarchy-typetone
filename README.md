@@ -3,12 +3,12 @@
 Mechanical keyboard and mouse-click sounds for the Omarchy desktop, powered by
 [Wayvibes](https://github.com/sahaj-b/wayvibes).
 
-TypeTone is an Omarchy Quattro service and bar widget. It manages a Wayvibes
+TypeTone is an Omarchy Quattro service and bar widget. It manages Wayvibes
 processes, provides controls that match the Omarchy shell, and remembers the
 preferred volume for each keyboard and mouse sound pack. TypeTone does not
 synthesize keyboard audio itself: Wayvibes reads Linux input events and plays
-audio samples. The bundled mouse clicks are original sounds synthesized for
-TypeTone.
+audio samples. The bundled mouse clicks are processed from redistributable CC0
+recordings and work offline.
 
 ![TypeTone settings with the sound picker expanded](preview.png)
 
@@ -17,7 +17,8 @@ TypeTone.
 - Global mechanical-keyboard sounds on Wayland through Wayvibes
 - Left, right, middle, side, and extra mouse-button sounds
 - Automatic mouse and touchpad detection with a device selector
-- Three original mouse-click styles: Crisp, Soft, and Deep
+- Six recorded mouse-click profiles: Clean, Soft, Deep, Razer, Logitech, and
+  Studio
 - Omarchy bar control with click-to-toggle and right-click settings
 - Scrollable selector for 20 upstream sound packs
 - Independent volume memory for every keyboard and mouse sound pack
@@ -35,8 +36,9 @@ TypeTone.
 - Permission to read the selected keyboard and pointing device through Linux
   `evdev`
 
-Wayvibes and its sound packs are external dependencies. They are not included
-in this repository and are not covered by TypeTone's license. See
+Wayvibes and its keyboard sound packs are external dependencies. They are not
+included in this repository and are not covered by TypeTone's license. The
+bundled mouse recordings use CC0; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Install
@@ -117,10 +119,16 @@ process for the selected pointing device and maps the standard left, right,
 middle, side, and extra button codes. Keyboard behavior and Wayvibes' saved
 keyboard selection remain independent.
 
-The Crisp, Soft, and Deep mouse packs are synthesized TypeTone assets rather
-than third-party recordings. Their reproducible source is
-[`tools/generate-mouse-sounds.sh`](tools/generate-mouse-sounds.sh); `ffmpeg` is
-needed only to regenerate the WAV files, not to use TypeTone.
+TypeTone includes six profiles built from real mouse recordings: Clean, Soft,
+Deep, Razer, Logitech, and Studio. Clean, Soft, and Deep retain the old
+internal pack IDs so existing per-pack volume preferences continue to work
+after upgrading from 1.1.
+
+The processed WAV files are reproducible with
+[`tools/generate-mouse-sounds.sh`](tools/generate-mouse-sounds.sh). `ffmpeg` is
+needed only to regenerate them, not to use TypeTone. Source recordings,
+authors, checksums, and license links are documented in
+[`third_party/mouse-sounds/README.md`](third_party/mouse-sounds/README.md).
 
 ## Configuration
 
@@ -179,9 +187,9 @@ Created by [Phuc Le (@phuclh93)](https://x.com/phuclh93).
 TypeTone is built on top of
 [Wayvibes by sahaj-b](https://github.com/sahaj-b/wayvibes), which provides the
 keyboard-event and audio engine. TypeTone provides the Omarchy integration,
-controls, mouse-device adapter, original mouse sounds, persistence, and
+controls, mouse-device adapter, processed mouse packs, persistence, and
 per-pack volume profiles.
 
 TypeTone's original source code and documentation are released under the
-[MIT License](LICENSE). External software and sound recordings remain under
-their respective authors' terms.
+[MIT License](LICENSE). External software and bundled CC0 sound recordings
+remain under their respective authors' terms.

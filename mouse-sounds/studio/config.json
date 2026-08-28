@@ -1,6 +1,6 @@
 {
-  "id": "typetone-mouse-crisp",
-  "name": "TypeTone Mouse — Clean",
+  "id": "typetone-mouse-studio",
+  "name": "TypeTone Mouse — Studio",
   "key_define_type": "multiple",
   "includes_numpad": false,
   "sound": "left.wav",
@@ -11,5 +11,5 @@
     "275": "middle.wav",
     "276": "middle.wav"
   },
-  "description": "Cleaned real-mouse recording by Six Ways, CC0"
+  "description": "Close-mic mouse-button recording by 1j01, CC0"
 }

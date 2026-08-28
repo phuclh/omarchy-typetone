@@ -77,9 +77,12 @@ Item {
   ]
 
   readonly property var mousePackOptions: [
-    { value: "crisp", label: "Crisp" },
+    { value: "crisp", label: "Clean" },
     { value: "soft", label: "Soft" },
-    { value: "deep", label: "Deep" }
+    { value: "deep", label: "Deep" },
+    { value: "razer", label: "Razer" },
+    { value: "logitech", label: "Logitech" },
+    { value: "studio", label: "Studio" }
   ]
 
   function resolvedLocalPath(relativePath) {

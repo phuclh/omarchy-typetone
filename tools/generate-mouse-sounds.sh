@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+source_root="$repo_dir/third_party/mouse-sounds"
 output_root="$repo_dir/mouse-sounds"
 
 command -v ffmpeg >/dev/null 2>&1 || {
@@ -9,43 +10,74 @@ command -v ffmpeg >/dev/null 2>&1 || {
   exit 1
 }
 
-make_click() {
-  local output=$1
-  local body_frequency=$2
-  local release_frequency=$3
-  local highpass=$4
-  local lowpass=$5
-  local body_volume=$6
-  local noise_volume=$7
-  local release_volume=$8
-  local release_delay=$9
-  local seed=${10}
+render_click() {
+  local source=$1
+  local output=$2
+  local start=$3
+  local duration=$4
+  local pitch=$5
+  local lowpass=$6
+  local gain=$7
 
+  [[ -f "$source" ]] || {
+    echo "Missing source recording: $source" >&2
+    exit 1
+  }
+
+  mkdir -p "$(dirname -- "$output")"
   ffmpeg -hide_banner -loglevel error -y \
-    -f lavfi -i "sine=frequency=${body_frequency}:sample_rate=48000:duration=0.08" \
-    -f lavfi -i "anoisesrc=color=white:sample_rate=48000:duration=0.08:amplitude=0.7:seed=${seed}" \
-    -f lavfi -i "sine=frequency=${release_frequency}:sample_rate=48000:duration=0.05" \
-    -filter_complex \
-      "[0:a]afade=t=out:st=0:d=0.018,volume=${body_volume}[body]; \
-       [1:a]highpass=f=${highpass},lowpass=f=${lowpass},afade=t=out:st=0:d=0.011,volume=${noise_volume}[noise]; \
-       [2:a]afade=t=out:st=0:d=0.011,volume=${release_volume},adelay=${release_delay}:all=1[release]; \
-       [body][noise][release]amix=inputs=3:normalize=0,alimiter=limit=0.88,atrim=0:0.075,asetpts=N/SR/TB[out]" \
-    -map "[out]" -ar 48000 -ac 1 -c:a pcm_s16le "$output"
+    -ss "$start" -t "$duration" -i "$source" \
+    -af "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=mono,\
+highpass=f=80,lowpass=f=${lowpass},volume=${gain},\
+asetrate=48000*${pitch},aresample=48000,\
+afade=t=in:st=0:d=0.001,areverse,afade=t=in:st=0:d=0.006,areverse,\
+alimiter=limit=0.50:attack=1:release=5:level=false" \
+    -ar 48000 -ac 1 -c:a pcm_s16le "$output"
 }
 
-# Crisp: bright shell snap with a small release tick.
-make_click "$output_root/crisp/left.wav"   3150 4200 1700 10000 0.54 0.30 0.19 24 101
-make_click "$output_root/crisp/right.wav"  3500 4550 1900 11000 0.48 0.27 0.17 23 102
-make_click "$output_root/crisp/middle.wav" 2700 3700 1400  9000 0.50 0.25 0.18 25 103
+render_variants() {
+  local pack=$1
+  local source=$2
+  local start=$3
+  local duration=$4
+  local lowpass=$5
+  local gain=$6
+  local left_pitch=${7:-1.0}
+  local right_pitch=${8:-1.035}
+  local middle_pitch=${9:-0.92}
 
-# Soft: muted, rounded clicks suitable for long sessions.
-make_click "$output_root/soft/left.wav"   1550 2300 550 5200 0.43 0.15 0.13 27 201
-make_click "$output_root/soft/right.wav"  1750 2500 650 5600 0.39 0.14 0.12 26 202
-make_click "$output_root/soft/middle.wav" 1300 2050 450 4800 0.41 0.13 0.12 28 203
+  render_click "$source" "$output_root/$pack/left.wav" \
+    "$start" "$duration" "$left_pitch" "$lowpass" "$gain"
+  render_click "$source" "$output_root/$pack/right.wav" \
+    "$start" "$duration" "$right_pitch" "$lowpass" "$gain"
+  render_click "$source" "$output_root/$pack/middle.wav" \
+    "$start" "$duration" "$middle_pitch" "$lowpass" "$gain"
+}
 
-# Deep: lower-pitched, weightier button response.
-make_click "$output_root/deep/left.wav"    720 1320 180 3200 0.58 0.17 0.16 29 301
-make_click "$output_root/deep/right.wav"   840 1480 220 3500 0.52 0.16 0.15 28 302
-make_click "$output_root/deep/middle.wav"  610 1150 150 2900 0.56 0.15 0.15 30 303
+# Clean: a tightly edited, noise-free mouse recording.
+render_variants crisp "$source_root/sixways-clean.mp3" 0 0.132 14000 2.00
 
-echo "Regenerated TypeTone mouse sounds in $output_root"
+# Soft: a rounded real-mouse recording with the high end gently reduced.
+render_variants soft "$source_root/breviceps-clicks.mp3" 0.035 0.170 6500 7.00 \
+  0.97 1.01 0.90
+
+# Deep: a lower, weightier treatment of a Razer mouse recording.
+render_variants deep "$source_root/katsuhira-razer.mp3" 0.380 0.220 5200 3.50 \
+  0.84 0.88 0.78
+
+# Named hardware profiles retain more of each original recording's character.
+render_variants razer "$source_root/katsuhira-razer.mp3" 0.380 0.220 12000 1.85 \
+  1.00 1.04 0.93
+render_variants logitech "$source_root/owlstorm-logitech.mp3" 2.470 0.320 12000 1.60 \
+  1.00 1.035 0.92
+
+# Studio uses a close-mic middle-button recording with separate press/release
+# takes for a little more left/right variation.
+render_click "$source_root/middle-click-press.wav" \
+  "$output_root/studio/left.wav" 0 0.075 1.00 13000 10.0
+render_click "$source_root/middle-click-release.wav" \
+  "$output_root/studio/right.wav" 0 0.073 1.04 13000 12.0
+render_click "$source_root/middle-click-press.wav" \
+  "$output_root/studio/middle.wav" 0 0.075 0.90 9000 10.0
+
+echo "Regenerated six recorded TypeTone mouse packs in $output_root"

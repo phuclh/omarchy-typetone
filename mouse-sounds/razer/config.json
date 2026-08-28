@@ -1,6 +1,6 @@
 {
-  "id": "typetone-mouse-crisp",
-  "name": "TypeTone Mouse — Clean",
+  "id": "typetone-mouse-razer",
+  "name": "TypeTone Mouse — Razer",
   "key_define_type": "multiple",
   "includes_numpad": false,
   "sound": "left.wav",
@@ -11,5 +11,5 @@
     "275": "middle.wav",
     "276": "middle.wav"
   },
-  "description": "Cleaned real-mouse recording by Six Ways, CC0"
+  "description": "Razer DeathAdder Essential recording by Katsuhira, CC0"
 }
