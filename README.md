@@ -26,6 +26,7 @@ recordings and work offline.
 - Separate keyboard and mouse toggles, packs, devices, and volume profiles
 - Icon-only bar control with a master mute that restores the previous toggles
 - Guided one-command setup for Wayvibes, sound packs, permissions, and TypeTone
+- Automatic compatibility repair for upstream packs with missing mapped samples
 - Automatic Wayvibes process lifecycle and visible error/status feedback
 - No network access or telemetry in the TypeTone plugin
 
@@ -42,6 +43,11 @@ Wayvibes and its keyboard sound packs are external dependencies. They are not
 included in this repository and are not covered by TypeTone's license. The
 bundled mouse recordings use CC0; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Some upstream keyboard-pack configs reference sample filenames that are not
+included in the pack. Before starting keyboard playback, TypeTone fills only
+those missing filenames with relative symlinks to an existing short per-key
+sample from the same pack. It does not rewrite the pack's config or audio.
 
 ## Install
 
@@ -187,17 +193,19 @@ omarchy plugin remove io.github.phuclh.typetone
 ```
 
 Removing TypeTone does not delete Wayvibes, downloaded sound packs, or
-`~/.config/wayvibes/omarchy.json`. Remove those separately only if no other
-application uses them.
+`~/.config/wayvibes/omarchy.json`. It also leaves any small compatibility
+symlinks created for missing upstream samples. Remove those separately only if
+no other application uses them.
 
 ## Security and privacy
 
 Omarchy plugins run as unsandboxed user code. TypeTone starts and stops the
 `wayvibes` executable, reads Linux keyboard and pointing-device events, writes
-its settings plus an isolated Wayvibes mouse-device selection, and does not
-make network requests. Wayvibes requires global access to input events via
-`evdev`; do not run it as root. Review the Wayvibes source and use only sound
-packs you trust.
+its settings plus an isolated Wayvibes mouse-device selection, and may add
+relative symlinks for missing mapped samples inside the selected keyboard
+sound pack. It does not make network requests. Wayvibes requires global access
+to input events via `evdev`; do not run it as root. Review the Wayvibes source
+and use only sound packs you trust.
 
 TypeTone does not store typed text, pointer movement, clicks, or input-event
 history. It reacts to process status and delegates input-event handling and

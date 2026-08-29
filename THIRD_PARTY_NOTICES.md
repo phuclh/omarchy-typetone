@@ -14,7 +14,7 @@ identified separately below.
 
 TypeTone starts the `wayvibes` executable but does not copy or modify its
 source. Review the upstream project and its terms before installing, using, or
-redistributing it. At the time of TypeTone 1.3.0, the upstream repository does
+redistributing it. At the time of TypeTone 1.3.1, the upstream repository does
 not expose a root license file.
 
 ## Sound packs
@@ -23,7 +23,9 @@ TypeTone recognizes the pre-converted sound-pack directory names published in
 the Wayvibes repository. The audio files and their `config.json` mappings are
 downloaded separately by the user and are not included here. Sound recordings
 may have pack-specific authors or terms; TypeTone's MIT license does not apply
-to them.
+to them. When a config references an absent sample, TypeTone may create a
+relative compatibility symlink inside that pack to another mapped sample from
+the same pack; it does not alter or redistribute the recordings.
 
 ## Bundled mouse recordings
 

@@ -14,6 +14,7 @@ Item {
   readonly property string soundpacksRoot: homeDir + "/.local/share/wayvibes/soundpacks"
   readonly property string mouseSoundpacksRoot: resolvedLocalPath("mouse-sounds")
   readonly property string mouseDeviceListScript: resolvedLocalPath("scripts/list-pointing-devices.sh")
+  readonly property string keyboardRunnerScript: resolvedLocalPath("scripts/run-keyboard-wayvibes.sh")
   readonly property string mouseRunnerScript: resolvedLocalPath("scripts/run-mouse-wayvibes.sh")
   readonly property string mouseConfigHome: homeDir + "/.config/wayvibes/typetone-mouse"
 
@@ -476,10 +477,9 @@ Item {
     root.restartPending = false
     root.lastError = ""
     root.lastMessage = "Starting Wayvibes…"
-    var command = ["wayvibes"]
+    var command = [root.keyboardRunnerScript, root.packPath(root.pack), String(root.volume)]
     if (root.deviceName !== "")
-      command.push("--device-name", root.deviceName)
-    command.push(root.packPath(root.pack), "-v", String(root.volume))
+      command.push(root.deviceName)
     wayvibesProcess.command = command
     wayvibesProcess.running = true
   }
