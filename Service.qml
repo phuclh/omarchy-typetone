@@ -325,6 +325,7 @@ Item {
     var next = String(name || "")
     if (!root.isKnownPack(next) || root.pack === next) return
 
+    keyboardVolumeApplyTimer.stop()
     var fallbackVolume = root.volume
     root.rememberPackVolume(root.pack, root.volume)
     root.pack = next
@@ -334,13 +335,27 @@ Item {
     root.requestRestart()
   }
 
-  function setVolume(value) {
+  function previewVolume(value) {
     var next = root.clampVolume(value)
     if (Math.abs(root.volume - next) < 0.001) return
     root.volume = next
     root.rememberPackVolume(root.pack, next)
+    keyboardVolumeApplyTimer.restart()
+  }
+
+  function commitVolume(value) {
+    keyboardVolumeApplyTimer.stop()
+    var next = root.clampVolume(value)
+    root.volume = next
+    root.rememberPackVolume(root.pack, next)
     root.persistSettings()
     root.requestRestart()
+  }
+
+  function setVolume(value) {
+    var next = root.clampVolume(value)
+    if (Math.abs(root.volume - next) < 0.001) return
+    root.commitVolume(next)
   }
 
   function setMouseEnabled(value) {
@@ -355,6 +370,7 @@ Item {
     var next = String(name || "")
     if (!root.isKnownMousePack(next) || root.mousePack === next) return
 
+    mouseVolumeApplyTimer.stop()
     var fallbackVolume = root.mouseVolume
     root.rememberMousePackVolume(root.mousePack, root.mouseVolume)
     root.mousePack = next
@@ -364,13 +380,27 @@ Item {
     root.requestMouseRestart()
   }
 
-  function setMouseVolume(value) {
+  function previewMouseVolume(value) {
     var next = root.clampVolume(value)
     if (Math.abs(root.mouseVolume - next) < 0.001) return
     root.mouseVolume = next
     root.rememberMousePackVolume(root.mousePack, next)
+    mouseVolumeApplyTimer.restart()
+  }
+
+  function commitMouseVolume(value) {
+    mouseVolumeApplyTimer.stop()
+    var next = root.clampVolume(value)
+    root.mouseVolume = next
+    root.rememberMousePackVolume(root.mousePack, next)
     root.persistSettings()
     root.requestMouseRestart()
+  }
+
+  function setMouseVolume(value) {
+    var next = root.clampVolume(value)
+    if (Math.abs(root.mouseVolume - next) < 0.001) return
+    root.commitMouseVolume(next)
   }
 
   function setMouseDevice(name) {
@@ -554,6 +584,26 @@ Item {
     interval: 1
     repeat: false
     onTriggered: root.persistSettings()
+  }
+
+  Timer {
+    id: keyboardVolumeApplyTimer
+    interval: 250
+    repeat: false
+    onTriggered: {
+      root.persistSettings()
+      root.requestRestart()
+    }
+  }
+
+  Timer {
+    id: mouseVolumeApplyTimer
+    interval: 250
+    repeat: false
+    onTriggered: {
+      root.persistSettings()
+      root.requestMouseRestart()
+    }
   }
 
   Process {

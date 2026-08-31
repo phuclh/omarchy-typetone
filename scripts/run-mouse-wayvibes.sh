@@ -10,6 +10,7 @@ config_home=$1
 device_path=$2
 soundpack_path=$3
 volume=$4
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 
 case "$device_path" in
   /dev/input/event[0-9]* | /dev/input/by-id/* | /dev/input/by-path/*) ;;
@@ -32,4 +33,6 @@ fi
 mkdir -p "$config_home/wayvibes"
 printf 'PATH:%s\n' "$device_path" > "$config_home/wayvibes/input_device"
 
-exec env XDG_CONFIG_HOME="$config_home" wayvibes "$soundpack_path" -v "$volume"
+export XDG_CONFIG_HOME="$config_home"
+exec "$script_dir/run-exclusive-wayvibes.sh" mouse -- \
+  wayvibes "$soundpack_path" -v "$volume"

@@ -22,11 +22,13 @@ recordings and work offline.
 - Omarchy bar control with click-to-toggle and right-click settings
 - Scrollable selector for 20 upstream sound packs
 - Independent volume memory for every keyboard and mouse sound pack
+- Live profile updates while dragging either volume control
 - Mouse-wheel volume control from the bar
 - Separate keyboard and mouse toggles, packs, devices, and volume profiles
 - Icon-only bar control with a master mute that restores the previous toggles
 - Guided one-command setup for Wayvibes, sound packs, permissions, and TypeTone
 - Automatic compatibility repair for upstream packs with missing mapped samples
+- One guarded keyboard process and one guarded mouse process after shell reloads
 - Automatic Wayvibes process lifecycle and visible error/status feedback
 - No network access or telemetry in the TypeTone plugin
 
@@ -203,9 +205,10 @@ Omarchy plugins run as unsandboxed user code. TypeTone starts and stops the
 `wayvibes` executable, reads Linux keyboard and pointing-device events, writes
 its settings plus an isolated Wayvibes mouse-device selection, and may add
 relative symlinks for missing mapped samples inside the selected keyboard
-sound pack. It does not make network requests. Wayvibes requires global access
-to input events via `evdev`; do not run it as root. Review the Wayvibes source
-and use only sound packs you trust.
+sound pack. It also replaces an earlier TypeTone-managed Wayvibes process if
+one survives a shell reload. It does not make network requests. Wayvibes
+requires global access to input events via `evdev`; do not run it as root.
+Review the Wayvibes source and use only sound packs you trust.
 
 TypeTone does not store typed text, pointer movement, clicks, or input-event
 history. It reacts to process status and delegates input-event handling and

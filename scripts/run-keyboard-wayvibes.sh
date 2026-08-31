@@ -19,4 +19,4 @@ if [[ -n $device_name ]]; then
 fi
 command+=("$soundpack_path" -v "$volume")
 
-exec "${command[@]}"
+exec "$script_dir/run-exclusive-wayvibes.sh" keyboard -- "${command[@]}"

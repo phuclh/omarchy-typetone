@@ -345,8 +345,10 @@ BarWidget {
                 selected: root.wayvibesService
                   && root.packValue(modelData) === root.wayvibesService.pack
                 onClicked: {
-                  if (root.wayvibesService)
+                  if (root.wayvibesService) {
                     root.wayvibesService.setPack(root.packValue(modelData))
+                    volumeSlider.liveValue = root.wayvibesService.volume
+                  }
                   root.packPickerOpen = false
                 }
               }
@@ -394,8 +396,11 @@ BarWidget {
             maximum: 3
             step: 0.05
             value: root.wayvibesService ? root.wayvibesService.volume : 1
+            onMoved: function(value) {
+              if (root.wayvibesService) root.wayvibesService.previewVolume(value)
+            }
             onReleased: function(value) {
-              if (root.wayvibesService) root.wayvibesService.setVolume(value)
+              if (root.wayvibesService) root.wayvibesService.commitVolume(value)
             }
           }
         }
@@ -558,8 +563,10 @@ BarWidget {
                 selected: root.wayvibesService
                   && root.packValue(modelData) === root.wayvibesService.mousePack
                 onClicked: {
-                  if (root.wayvibesService)
+                  if (root.wayvibesService) {
                     root.wayvibesService.setMousePack(root.packValue(modelData))
+                    mouseVolumeSlider.liveValue = root.wayvibesService.mouseVolume
+                  }
                   root.mousePackPickerOpen = false
                 }
               }
@@ -607,8 +614,11 @@ BarWidget {
             maximum: 3
             step: 0.05
             value: root.wayvibesService ? root.wayvibesService.mouseVolume : 0.75
+            onMoved: function(value) {
+              if (root.wayvibesService) root.wayvibesService.previewMouseVolume(value)
+            }
             onReleased: function(value) {
-              if (root.wayvibesService) root.wayvibesService.setMouseVolume(value)
+              if (root.wayvibesService) root.wayvibesService.commitMouseVolume(value)
             }
           }
         }
