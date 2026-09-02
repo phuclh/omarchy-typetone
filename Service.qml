@@ -10,15 +10,21 @@ Item {
   property var manifest: null
 
   readonly property string homeDir: Quickshell.env("HOME")
-  readonly property string settingsPath: homeDir + "/.config/wayvibes/omarchy.json"
-  readonly property string soundpacksRoot: homeDir + "/.local/share/wayvibes/soundpacks"
+  readonly property string configHome: Quickshell.env("XDG_CONFIG_HOME")
+    || homeDir + "/.config"
+  readonly property string dataHome: Quickshell.env("XDG_DATA_HOME")
+    || homeDir + "/.local/share"
+  readonly property string wayvibesCommit: "b43b76fd3a4181b7bd9029372b93d503ce91dced"
+  readonly property string settingsPath: configHome + "/wayvibes/omarchy.json"
+  readonly property string soundpacksRoot: dataHome
+    + "/typetone/vendor/wayvibes/" + wayvibesCommit + "/soundpacks"
   readonly property string mouseSoundpacksRoot: resolvedLocalPath("mouse-sounds")
   readonly property string mouseDeviceListScript: resolvedLocalPath("scripts/list-pointing-devices.sh")
   readonly property string inputAccessCheckScript: resolvedLocalPath("scripts/check-input-access.sh")
   readonly property string inputAccessRequestScript: resolvedLocalPath("scripts/request-input-access.sh")
   readonly property string keyboardRunnerScript: resolvedLocalPath("scripts/run-keyboard-wayvibes.sh")
   readonly property string mouseRunnerScript: resolvedLocalPath("scripts/run-mouse-wayvibes.sh")
-  readonly property string mouseConfigHome: homeDir + "/.config/wayvibes/typetone-mouse"
+  readonly property string mouseConfigHome: configHome + "/wayvibes/typetone-mouse"
 
   property bool settingsLoaded: false
   property bool soundsEnabled: true

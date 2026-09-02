@@ -10,22 +10,27 @@ identified separately below.
 - Project: [sahaj-b/wayvibes](https://github.com/sahaj-b/wayvibes)
 - Role: reads Linux `evdev` keyboard or pointing-device events and plays sound
   samples
-- Distribution: installed separately by the user
+- Reviewed source snapshot: `b43b76fd3a4181b7bd9029372b93d503ce91dced`
+- Distribution: fetched directly from upstream and compiled locally by the
+  reviewed TypeTone installer
 
-TypeTone starts the `wayvibes` executable but does not copy or modify its
-source. Review the upstream project and its terms before installing, using, or
-redistributing it. At the time of TypeTone 1.3.3, the upstream repository does
-not expose a root license file.
+The installer verifies the full Git commit, compiles it with a fixed command,
+and stores the resulting executable and sound packs in a commit-specific local
+directory. It does not execute Wayvibes' installer or build scripts. Review the
+upstream project and its terms before installing, using, or redistributing it.
+At the time of TypeTone 1.3.4, the upstream repository does not expose a root
+license file.
 
 ## Sound packs
 
 TypeTone recognizes the pre-converted sound-pack directory names published in
-the Wayvibes repository. The audio files and their `config.json` mappings are
-downloaded separately by the user and are not included here. Sound recordings
-may have pack-specific authors or terms; TypeTone's MIT license does not apply
-to them. When a config references an absent sample, TypeTone may create a
-relative compatibility symlink inside that pack to another mapped sample from
-the same pack; it does not alter or redistribute the recordings.
+the Wayvibes repository. The reviewed installer fetches the audio files and
+their `config.json` mappings from the same pinned Wayvibes commit; they are not
+included here. Sound recordings may have pack-specific authors or terms;
+TypeTone's MIT license does not apply to them. When a config references an
+absent sample, TypeTone may create a relative compatibility symlink inside that
+pack to another mapped sample from the same pack; it does not alter or
+redistribute the recordings.
 
 ## Bundled mouse recordings
 

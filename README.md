@@ -26,7 +26,7 @@ recordings and work offline.
 - Mouse-wheel volume control from the bar
 - Separate keyboard and mouse toggles, packs, devices, and volume profiles
 - Icon-only bar control with a master mute that restores the previous toggles
-- Guided one-command setup for Wayvibes, sound packs, permissions, and TypeTone
+- Commit-verified setup for Wayvibes, sound packs, permissions, and TypeTone
 - In-widget input-access detection and administrator-authenticated repair
 - Automatic compatibility repair for upstream packs with missing mapped samples
 - One guarded keyboard process and one guarded mouse process after shell reloads
@@ -36,15 +36,17 @@ recordings and work offline.
 ## Requirements
 
 - Omarchy Quattro with the plugin-capable Omarchy shell
-- [Wayvibes](https://github.com/sahaj-b/wayvibes)
-- A Wayvibes-compatible sound-pack collection at
-  `~/.local/share/wayvibes/soundpacks`
+- Git and a C++17 compiler
+- `libevdev` and `nlohmann-json` development files
 - Permission to read the selected keyboard and pointing device through Linux
   `evdev`
 
-Wayvibes and its keyboard sound packs are external dependencies. They are not
-included in this repository and are not covered by TypeTone's license. The
-bundled mouse recordings use CC0; see
+The reviewed installer obtains the compiler and development files from signed
+official Arch packages when they are missing. It fetches Wayvibes and its
+keyboard packs directly from upstream at the immutable full commit
+`b43b76fd3a4181b7bd9029372b93d503ce91dced`, verifies the Git object, and builds
+it locally. Wayvibes and its keyboard packs are not covered by TypeTone's
+license. The bundled mouse recordings use CC0; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Some upstream keyboard-pack configs reference sample filenames that are not
@@ -54,48 +56,60 @@ sample from the same pack. It does not rewrite the pack's config or audio.
 
 ## Install
 
-### Guided setup
+### Install a reviewed snapshot
 
-Paste this one command into an Omarchy terminal:
+Copy the exact 40-character commit from the latest **Marketplace validation**
+comment in the [TypeTone submission](https://github.com/omacom/omarchy-plugin-marketplace/issues/3180),
+replace the placeholder below, and paste the block into an Omarchy terminal:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/phuclh/omarchy-typetone/main/install.sh)
+(
+  set -euo pipefail
+  TYPETONE_COMMIT='<PASTE-40-CHARACTER-VALIDATED-COMMIT>'
+  [[ $TYPETONE_COMMIT =~ ^[0-9a-f]{40}$ ]]
+  TYPETONE_CHECKOUT=$(mktemp -d)
+  git -C "$TYPETONE_CHECKOUT" init --quiet
+  git -C "$TYPETONE_CHECKOUT" remote add origin \
+    https://github.com/phuclh/omarchy-typetone.git
+  git -C "$TYPETONE_CHECKOUT" fetch --quiet --depth=1 origin "$TYPETONE_COMMIT"
+  [[ $(git -C "$TYPETONE_CHECKOUT" rev-parse FETCH_HEAD) == "$TYPETONE_COMMIT" ]]
+  git -C "$TYPETONE_CHECKOUT" checkout --quiet --detach "$TYPETONE_COMMIT"
+  "$TYPETONE_CHECKOUT/install.sh" --typetone-commit "$TYPETONE_COMMIT"
+)
 ```
 
-The installer explains each action and asks before making changes. It installs
-Wayvibes, grants input-device access, downloads the keyboard sound packs,
-selects a detected keyboard, and installs TypeTone from GitHub. If it adds your
-user to the `input` group, restart your computer once when it finishes. A
-restart also handles desktop sessions that remain alive after a normal logout.
+The repository cannot embed the hash of the commit that contains that same
+hash, so the reviewed commit is supplied by the marketplace validation record.
+The block fetches only that content-addressed commit and verifies it before
+executing the local installer. It never streams a script from a moving branch.
+
+The installer shows both pinned commits and every privileged effect before it
+asks whether to continue. It installs signed build dependencies if necessary,
+compiles Wayvibes with a fixed command instead of executing its build or
+installer scripts, installs its sound packs in a commit-specific directory,
+selects a detected keyboard, and installs the same detached TypeTone commit.
+The installed checkout has no Git remote, so the generic Omarchy updater cannot
+silently move it to an unreviewed branch. When replacing an enabled version, it
+reloads the Omarchy shell so no cached QML from the prior snapshot remains.
+Future updates reuse an unchanged Wayvibes snapshot only after checking its
+source record, binary checksum, fixed sound-pack manifest checksum, all 1,480
+sound-pack files, and the absence of unexpected regular files. If access to the
+network is removed after the two exact Git fetches, the remaining setup is
+local except for signed Arch packages that were missing.
+
+If the installer adds your user to the `input` group, restart your computer once
+when it finishes. A restart also handles desktop sessions that remain alive
+after a normal logout.
 
 Membership in the Linux `input` group lets applications running as your user
 read global keyboard and pointing-device events. The installer discloses this
 before requesting administrator authentication.
 
 Review [`install.sh`](install.sh) before running it. Omarchy plugins and this
-installer run as unsandboxed user code.
-
-### Manual setup
-
-#### 1. Install Wayvibes
-
-From an Omarchy terminal:
-
-```bash
-omarchy pkg aur add wayvibes-git
-```
-
-Your user must be in the `input` group so Wayvibes can read keyboard and mouse
-events:
-
-```bash
-sudo usermod -aG input "$USER"
-```
-
-Restart your computer once after changing group membership.
-
-This permission applies to the user account, not only to TypeTone. Other
-applications running as that user could also read global input events.
+installer run as unsandboxed user code. For a manual installation, perform the
+same fetch verification and then follow the fixed commands in that reviewed
+installer; do not substitute a branch name, the AUR `wayvibes-git` recipe, or
+Wayvibes' upstream installer.
 
 #### Input permission and administrator access
 
@@ -117,40 +131,6 @@ This broad group permission is required because Wayvibes reads raw `evdev`
 devices. It allows every process running as the account—not just TypeTone—to
 observe global keyboard and mouse events. Restart once after granting or
 revoking it so every desktop process receives the new group list.
-
-#### 2. Download the upstream sound packs
-
-For a new installation, use a sparse clone so only the `soundpacks` directory
-is checked out:
-
-```bash
-git clone --depth 1 --filter=blob:none --sparse \
-  https://github.com/sahaj-b/wayvibes.git \
-  "$HOME/.local/share/wayvibes"
-git -C "$HOME/.local/share/wayvibes" sparse-checkout set soundpacks
-```
-
-If `~/.local/share/wayvibes` already exists, keep it and place compatible packs
-inside its `soundpacks` directory instead of running the clone command.
-
-#### 3. Select a keyboard once
-
-Run Wayvibes interactively before enabling TypeTone:
-
-```bash
-wayvibes --device "$HOME/.local/share/wayvibes/soundpacks/nk-cream" -v 0
-```
-
-Choose the keyboard in the terminal, then press `Ctrl+C`. Wayvibes remembers
-the selection. Users of `keyd` or another remapper should normally select its
-virtual keyboard. TypeTone also supports an explicit `deviceName` override in
-its settings file.
-
-#### 4. Install TypeTone
-
-```bash
-omarchy plugin add https://github.com/phuclh/omarchy-typetone.git --enable
-```
 
 TypeTone appears on the right side of the Omarchy bar by default. Existing
 installations keep mouse sounds disabled until they are turned on from the
@@ -224,9 +204,11 @@ omarchy-shell typetone status
 
 ## Update
 
-```bash
-omarchy plugin update io.github.phuclh.typetone --yes
-```
+Wait for the desired release to receive a new marketplace validation, then run
+the verified installation block again with that new full commit. The installer
+preserves the prior plugin checkout as a hidden backup and keeps its enabled or
+disabled state. Do not use `omarchy plugin update` for TypeTone: it follows the
+repository's moving default branch rather than a reviewed commit.
 
 ## Remove
 
@@ -234,7 +216,8 @@ omarchy plugin update io.github.phuclh.typetone --yes
 omarchy plugin remove io.github.phuclh.typetone
 ```
 
-Removing TypeTone does not delete Wayvibes, downloaded sound packs, or
+Removing TypeTone does not delete the pinned Wayvibes build and sound packs
+under `~/.local/share/typetone/vendor/wayvibes`, prior hidden plugin backups, or
 `~/.config/wayvibes/omarchy.json`. It also leaves any small compatibility
 symlinks created for missing upstream samples. Remove those separately only if
 no other application uses them.
@@ -242,25 +225,33 @@ no other application uses them.
 ## Security and privacy
 
 Omarchy plugins run as unsandboxed user code. TypeTone starts and stops the
-`wayvibes` executable, reads Linux keyboard and pointing-device events, writes
-its settings plus an isolated Wayvibes mouse-device selection, and may add
-relative symlinks for missing mapped samples inside the selected keyboard
-sound pack. It also replaces an earlier TypeTone-managed Wayvibes process if
-one survives a shell reload. It does not make network requests. Wayvibes
-requires global access to input events via `evdev`; TypeTone may request
-administrator authentication to add the current account to the Linux `input`
-group. This grants every process running as that user permission to read input
-events, not only TypeTone. Do not run Wayvibes as root. Review the Wayvibes
-source and use only sound packs you trust.
+commit-pinned `wayvibes` executable, reads Linux keyboard and pointing-device
+events, writes its settings plus an isolated Wayvibes mouse-device selection,
+and may add relative symlinks for missing mapped samples inside the selected
+keyboard sound pack. It also replaces an earlier TypeTone-managed Wayvibes
+process if one survives a shell reload. It does not make network requests.
+Wayvibes requires global access to input events via `evdev`; TypeTone may
+request administrator authentication to add the current account to the Linux
+`input` group. This grants every process running as that user permission to
+read input events, not only TypeTone. Do not run Wayvibes as root. Review the
+Wayvibes source and use only sound packs you trust.
 
 TypeTone's process guard stores only same-user runtime state below the
 owner-only `$XDG_RUNTIME_DIR/typetone` directory. It rejects symlinked,
 wrong-owner, wrong-type, permission-relaxed, or inode-swapped state before
 trusting it. Lock paths remain anchored to verified open directory descriptors.
 When replacing a previous instance, it signals only an unprivileged process
-owned by the current user after matching the recorded start time, Bash
-executable, guard script path, role, and Wayvibes command. Runtime PIDs are
-never passed across a privilege boundary.
+owned by the current user after matching the recorded start time and either the
+legacy Bash guard's executable, script path, role, and command or the exact
+pinned Wayvibes executable and complete role-specific argument shape. The
+launcher replaces itself with Wayvibes so Quickshell directly owns and stops
+the audio process. Runtime PIDs are never passed across a privilege boundary.
+
+The reviewed installer fetches both TypeTone and Wayvibes only by immutable
+full Git commits, verifies the resolved objects, and never executes a remotely
+streamed script, Wayvibes build script, AUR recipe, or moving Git branch. Its
+fixed C++ build links against signed Arch dependencies, and TypeTone invokes
+the resulting binary by its commit-specific absolute path.
 
 TypeTone does not store typed text, pointer movement, clicks, or input-event
 history. It reacts to process status and delegates input-event handling and
