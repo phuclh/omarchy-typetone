@@ -21,7 +21,7 @@ case "$device_path" in
 esac
 
 if [[ ! -r "$device_path" ]]; then
-  echo "Cannot read mouse device $device_path. Log out and back in after joining the input group." >&2
+  echo "Cannot read mouse device $device_path. Restart once after joining the input group." >&2
   exit 1
 fi
 

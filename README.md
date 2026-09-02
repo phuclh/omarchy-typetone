@@ -19,7 +19,7 @@ recordings and work offline.
 - Automatic mouse and touchpad detection with a device selector
 - Six recorded mouse-click profiles: Clean, Soft, Deep, Razer, Logitech, and
   Studio
-- Omarchy bar control with click-to-toggle and right-click settings
+- Omarchy bar control with left-click settings and right-click master mute
 - Scrollable selector for 20 upstream sound packs
 - Independent volume memory for every keyboard and mouse sound pack
 - Live profile updates while dragging either volume control
@@ -27,6 +27,7 @@ recordings and work offline.
 - Separate keyboard and mouse toggles, packs, devices, and volume profiles
 - Icon-only bar control with a master mute that restores the previous toggles
 - Guided one-command setup for Wayvibes, sound packs, permissions, and TypeTone
+- In-widget input-access detection and administrator-authenticated repair
 - Automatic compatibility repair for upstream packs with missing mapped samples
 - One guarded keyboard process and one guarded mouse process after shell reloads
 - Automatic Wayvibes process lifecycle and visible error/status feedback
@@ -64,7 +65,12 @@ bash <(curl -fsSL https://raw.githubusercontent.com/phuclh/omarchy-typetone/main
 The installer explains each action and asks before making changes. It installs
 Wayvibes, grants input-device access, downloads the keyboard sound packs,
 selects a detected keyboard, and installs TypeTone from GitHub. If it adds your
-user to the `input` group, log out and back in once when it finishes.
+user to the `input` group, restart your computer once when it finishes. A
+restart also handles desktop sessions that remain alive after a normal logout.
+
+Membership in the Linux `input` group lets applications running as your user
+read global keyboard and pointing-device events. The installer discloses this
+before requesting administrator authentication.
 
 Review [`install.sh`](install.sh) before running it. Omarchy plugins and this
 installer run as unsandboxed user code.
@@ -86,7 +92,31 @@ events:
 sudo usermod -aG input "$USER"
 ```
 
-Log out and back in after changing group membership.
+Restart your computer once after changing group membership.
+
+This permission applies to the user account, not only to TypeTone. Other
+applications running as that user could also read global input events.
+
+#### Input permission and administrator access
+
+Wayvibes itself and the TypeTone audio processes always run as your normal
+user. The only privileged change TypeTone needs is persistent membership in
+Linux's `input` group:
+
+- The terminal installer runs `sudo usermod -aG input "$USER"` after disclosing
+  the scope and asking whether to continue.
+- The settings widget's **Grant access** action runs the fixed command
+  `/usr/bin/pkexec /usr/bin/usermod -aG input -- <current-user>` after deriving
+  and validating the current account name. It accepts no caller arguments.
+- Both paths require explicit administrator authentication. Neither creates a
+  sudoers rule, and TypeTone never runs Wayvibes as root.
+- Group membership remains active until an administrator removes it. To revoke
+  it, run `sudo gpasswd -d "$USER" input`, then restart the computer.
+
+This broad group permission is required because Wayvibes reads raw `evdev`
+devices. It allows every process running as the account—not just TypeTone—to
+observe global keyboard and mouse events. Restart once after granting or
+revoking it so every desktop process receives the new group list.
 
 #### 2. Download the upstream sound packs
 
@@ -136,6 +166,13 @@ Mouse tab.
 - **Mouse tab:** enable mouse clicks, select a mouse or touchpad, choose a click
   style, and adjust its volume
 
+If TypeTone detects an existing keyboard or mouse that the current session
+cannot read, the settings widget displays an **Input access required** card.
+**Grant access** opens the system administrator-authentication dialog and adds
+the current account to the `input` group. TypeTone never grants this access
+silently. After authorization, **Restart computer** asks for confirmation before
+using Omarchy's standard reboot action. TypeTone then starts automatically.
+
 Each keyboard or mouse pack starts with the current volume the first time it is
 selected. After you adjust it once, TypeTone restores that pack's own level
 whenever you return to it.
@@ -156,8 +193,11 @@ after upgrading from 1.1.
 The processed WAV files are reproducible with
 [`tools/generate-mouse-sounds.sh`](tools/generate-mouse-sounds.sh). `ffmpeg` is
 needed only to regenerate them, not to use TypeTone. Source recordings,
-authors, checksums, and license links are documented in
+authors, exact asset URLs, checksums, and license links are documented in
 [`third_party/mouse-sounds/README.md`](third_party/mouse-sounds/README.md).
+Run [`tools/verify-mouse-sounds.sh`](tools/verify-mouse-sounds.sh) to verify the
+vendored sources and reproduce every processed WAV; its optional `--remote`
+mode also compares the official downloads byte-for-byte.
 
 ## Configuration
 
@@ -207,8 +247,20 @@ its settings plus an isolated Wayvibes mouse-device selection, and may add
 relative symlinks for missing mapped samples inside the selected keyboard
 sound pack. It also replaces an earlier TypeTone-managed Wayvibes process if
 one survives a shell reload. It does not make network requests. Wayvibes
-requires global access to input events via `evdev`; do not run it as root.
-Review the Wayvibes source and use only sound packs you trust.
+requires global access to input events via `evdev`; TypeTone may request
+administrator authentication to add the current account to the Linux `input`
+group. This grants every process running as that user permission to read input
+events, not only TypeTone. Do not run Wayvibes as root. Review the Wayvibes
+source and use only sound packs you trust.
+
+TypeTone's process guard stores only same-user runtime state below the
+owner-only `$XDG_RUNTIME_DIR/typetone` directory. It rejects symlinked,
+wrong-owner, wrong-type, permission-relaxed, or inode-swapped state before
+trusting it. Lock paths remain anchored to verified open directory descriptors.
+When replacing a previous instance, it signals only an unprivileged process
+owned by the current user after matching the recorded start time, Bash
+executable, guard script path, role, and Wayvibes command. Runtime PIDs are
+never passed across a privilege boundary.
 
 TypeTone does not store typed text, pointer movement, clicks, or input-event
 history. It reacts to process status and delegates input-event handling and

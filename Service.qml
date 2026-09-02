@@ -14,6 +14,8 @@ Item {
   readonly property string soundpacksRoot: homeDir + "/.local/share/wayvibes/soundpacks"
   readonly property string mouseSoundpacksRoot: resolvedLocalPath("mouse-sounds")
   readonly property string mouseDeviceListScript: resolvedLocalPath("scripts/list-pointing-devices.sh")
+  readonly property string inputAccessCheckScript: resolvedLocalPath("scripts/check-input-access.sh")
+  readonly property string inputAccessRequestScript: resolvedLocalPath("scripts/request-input-access.sh")
   readonly property string keyboardRunnerScript: resolvedLocalPath("scripts/run-keyboard-wayvibes.sh")
   readonly property string mouseRunnerScript: resolvedLocalPath("scripts/run-mouse-wayvibes.sh")
   readonly property string mouseConfigHome: homeDir + "/.config/wayvibes/typetone-mouse"
@@ -39,9 +41,33 @@ Item {
   property string lastError: ""
   property bool restartPending: false
   property bool mouseRestartPending: false
+  property bool inputAccessChecked: false
+  property bool inputAccessMissing: false
+  property bool inputAccessConfigured: false
+  property bool inputAccessActive: false
+  property bool inputAccessRescanPending: false
+  property string inputAccessUser: ""
+  property string keyboardDevicePath: ""
+  property bool keyboardDevicePresent: false
+  property bool mouseDevicePresent: false
+  property string inputAccessActionMessage: ""
+  property string inputAccessActionError: ""
+  property string _inputAccessScanOutput: ""
+  property string _inputAccessScanError: ""
+  property string _inputAccessGrantOutput: ""
+  property string _inputAccessGrantError: ""
+  property string _computerRestartError: ""
 
   readonly property bool running: wayvibesProcess.running
   readonly property bool mouseRunning: mouseWayvibesProcess.running
+  readonly property bool inputAccessScanning: inputAccessScanProcess.running
+  readonly property bool inputAccessGranting: inputAccessGrantProcess.running
+  readonly property bool computerRestarting: computerRestartProcess.running
+  readonly property bool inputAccessNeedsRelogin:
+    inputAccessMissing && inputAccessConfigured && !inputAccessActive
+  readonly property string inputAccessTitle:
+    inputAccessNeedsRelogin ? "Restart required" : "Input access required"
+  readonly property string inputAccessCommand: "sudo usermod -aG input \"$USER\""
   readonly property bool masterMuted: !soundsEnabled && !mouseEnabled
   readonly property string mouseDevicePath: pathForMouseDevice(mouseDeviceName)
   readonly property string keyboardStatusLabel: running
@@ -52,10 +78,12 @@ Item {
     : (mouseEnabled
       ? (mouseDeviceOptions.length > 0 ? "Starting mouse sounds…" : "No pointing device found")
       : "Mouse sounds are off")
-  readonly property string statusLabel: running && mouseRunning
+  readonly property string statusLabel: inputAccessMissing
+    ? inputAccessTitle
+    : (running && mouseRunning
     ? "Keyboard and mouse sounds active"
     : (running ? keyboardStatusLabel : (mouseRunning ? mouseStatusLabel
-      : ((soundsEnabled || mouseEnabled) ? "Starting TypeTone…" : "All sounds are off")))
+      : ((soundsEnabled || mouseEnabled) ? "Starting TypeTone…" : "All sounds are off"))))
 
   readonly property var packOptions: [
     { value: "nk-cream", label: "NK Cream" },
@@ -131,6 +159,112 @@ Item {
         return String(mouseDeviceOptions[i].label || mouseDeviceName)
     }
     return mouseDeviceName !== "" ? mouseDeviceName : "pointing device"
+  }
+
+  function inputAccessErrorMessage() {
+    return root.inputAccessNeedsRelogin
+      ? "Input access is configured. Restart your computer once to activate TypeTone."
+      : "TypeTone cannot read keyboard or mouse events. Grant input access to continue."
+  }
+
+  function rescanInputAccess() {
+    if (!root.settingsLoaded) return
+    if (inputAccessScanProcess.running) {
+      root.inputAccessRescanPending = true
+      return
+    }
+
+    root._inputAccessScanOutput = ""
+    root._inputAccessScanError = ""
+    inputAccessScanProcess.command = [
+      root.inputAccessCheckScript,
+      root.deviceName,
+      root.mouseDevicePath
+    ]
+    inputAccessScanProcess.running = true
+  }
+
+  function restartComputer() {
+    if (computerRestartProcess.running) return
+    root._computerRestartError = ""
+    root.inputAccessActionError = ""
+    root.inputAccessActionMessage = "Restarting your computer…"
+    computerRestartProcess.command = ["omarchy", "system", "reboot"]
+    computerRestartProcess.running = true
+  }
+
+  function applyInputAccessScan(raw) {
+    var parsed = null
+    try {
+      parsed = JSON.parse(String(raw || "{}"))
+    } catch (error) {
+      root.handleInputAccessScanFailure("Could not parse the input-access check.")
+      return
+    }
+
+    root.inputAccessUser = String(parsed.user || "")
+    root.keyboardDevicePath = String(parsed.keyboardPath || "")
+    root.keyboardDevicePresent = !!parsed.keyboardPresent
+    root.mouseDevicePresent = !!parsed.mousePresent
+    root.inputAccessConfigured = !!parsed.inputGroupConfigured
+    root.inputAccessActive = !!parsed.inputGroupActive
+    root.inputAccessMissing = (root.keyboardDevicePresent && !parsed.keyboardReadable)
+      || (root.mouseDevicePresent && !parsed.mouseReadable)
+    root.inputAccessChecked = true
+
+    if (root.inputAccessMissing) {
+      startTimer.stop()
+      mouseStartTimer.stop()
+      root.restartPending = false
+      root.mouseRestartPending = false
+      if (wayvibesProcess.running) wayvibesProcess.running = false
+      if (mouseWayvibesProcess.running) mouseWayvibesProcess.running = false
+      var message = root.inputAccessErrorMessage()
+      root.lastError = message
+      root.lastMessage = message
+      root.mouseLastError = message
+      root.mouseLastMessage = message
+      return
+    }
+
+    if (root.lastError.indexOf("Input access") === 0
+        || root.lastError.indexOf("TypeTone cannot read") === 0)
+      root.lastError = ""
+    if (root.mouseLastError.indexOf("Input access") === 0
+        || root.mouseLastError.indexOf("TypeTone cannot read") === 0)
+      root.mouseLastError = ""
+
+    if (root.soundsEnabled && !wayvibesProcess.running) startTimer.restart()
+    if (root.mouseEnabled) {
+      if (root.mouseDevicePath === "") root.rescanMouseDevices()
+      else if (!mouseWayvibesProcess.running) mouseStartTimer.restart()
+    }
+  }
+
+  function handleInputAccessScanFailure(message) {
+    root.inputAccessChecked = true
+    root.inputAccessMissing = false
+    root.inputAccessActionError = String(message || "Could not check input access.")
+    if (root.soundsEnabled && !wayvibesProcess.running) startTimer.restart()
+    if (root.mouseEnabled && root.mouseDevicePath !== "" && !mouseWayvibesProcess.running)
+      mouseStartTimer.restart()
+  }
+
+  function requestInputAccess() {
+    if (!root.inputAccessMissing || root.inputAccessGranting
+        || root.inputAccessNeedsRelogin) return
+    root.inputAccessActionMessage = "Waiting for administrator authentication…"
+    root.inputAccessActionError = ""
+    root._inputAccessGrantOutput = ""
+    root._inputAccessGrantError = ""
+    inputAccessGrantProcess.command = [root.inputAccessRequestScript]
+    inputAccessGrantProcess.running = true
+  }
+
+  function copyInputAccessCommand() {
+    Quickshell.execDetached(["wl-copy", root.inputAccessCommand])
+    root.inputAccessActionError = ""
+    root.inputAccessActionMessage = "Repair command copied."
   }
 
   function clampVolume(value) {
@@ -246,7 +380,7 @@ Item {
         || parsed.resumeKeyboardEnabled === undefined
         || parsed.resumeMouseEnabled === undefined)
       settingsMigrationTimer.restart()
-    if (root.soundsEnabled) startTimer.restart()
+    root.rescanInputAccess()
     root.rescanMouseDevices()
   }
 
@@ -453,12 +587,14 @@ Item {
     if (root.mouseDeviceName !== previousName) root.persistSettings()
 
     if (candidates.length === 0) {
+      root.rescanInputAccess()
       root.stopMouse()
       root.mouseLastMessage = "No mouse or touchpad found"
       root.mouseLastError = "No click-capable pointing device was detected."
       return
     }
 
+    root.rescanInputAccess()
     root.mouseLastMessage = root.mouseEnabled ? "Starting mouse sounds…" : "Mouse sounds are off"
     if (root.mouseEnabled) root.requestMouseRestart()
   }
@@ -503,6 +639,11 @@ Item {
 
   function start() {
     if (!root.settingsLoaded || !root.soundsEnabled || wayvibesProcess.running) return
+    if (!root.inputAccessChecked) {
+      root.rescanInputAccess()
+      return
+    }
+    if (root.inputAccessMissing) return
 
     root.restartPending = false
     root.lastError = ""
@@ -524,6 +665,11 @@ Item {
 
   function startMouse() {
     if (!root.settingsLoaded || !root.mouseEnabled || mouseWayvibesProcess.running) return
+    if (!root.inputAccessChecked) {
+      root.rescanInputAccess()
+      return
+    }
+    if (root.inputAccessMissing) return
     if (root.mouseDevicePath === "") {
       root.rescanMouseDevices()
       return
@@ -603,6 +749,101 @@ Item {
     onTriggered: {
       root.persistSettings()
       root.requestMouseRestart()
+    }
+  }
+
+  Timer {
+    id: inputAccessPostGrantTimer
+    interval: 350
+    repeat: false
+    onTriggered: root.rescanInputAccess()
+  }
+
+  Timer {
+    id: inputAccessRescanTimer
+    interval: 1
+    repeat: false
+    onTriggered: root.rescanInputAccess()
+  }
+
+  Process {
+    id: inputAccessScanProcess
+    running: false
+    command: []
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._inputAccessScanOutput = text
+    }
+
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._inputAccessScanError = text
+    }
+
+    onExited: function(exitCode) {
+      if (exitCode === 0)
+        root.applyInputAccessScan(root._inputAccessScanOutput)
+      else
+        root.handleInputAccessScanFailure(
+          String(root._inputAccessScanError || "Input-access check failed").trim())
+
+      if (root.inputAccessRescanPending) {
+        root.inputAccessRescanPending = false
+        inputAccessRescanTimer.restart()
+      }
+    }
+  }
+
+  Process {
+    id: inputAccessGrantProcess
+    running: false
+    command: []
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._inputAccessGrantOutput = text
+    }
+
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._inputAccessGrantError = text
+    }
+
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.inputAccessActionMessage = "Access granted. Restart your computer once to activate TypeTone."
+        root.inputAccessActionError = ""
+        inputAccessPostGrantTimer.restart()
+        return
+      }
+
+      root.inputAccessActionMessage = ""
+      if (exitCode === 126)
+        root.inputAccessActionError = "Permission request cancelled."
+      else {
+        var detail = String(root._inputAccessGrantError
+          || root._inputAccessGrantOutput || "Administrator authorization failed.").trim()
+        root.inputAccessActionError = detail
+      }
+    }
+  }
+
+  Process {
+    id: computerRestartProcess
+    running: false
+    command: []
+
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root._computerRestartError = text
+    }
+
+    onExited: function(exitCode) {
+      if (exitCode === 0) return
+      root.inputAccessActionMessage = ""
+      root.inputAccessActionError = String(root._computerRestartError
+        || "Could not restart the computer.").trim()
     }
   }
 
@@ -704,6 +945,8 @@ Item {
     if (wayvibesProcess.running) wayvibesProcess.running = false
     if (mouseWayvibesProcess.running) mouseWayvibesProcess.running = false
     if (mouseDeviceScanProcess.running) mouseDeviceScanProcess.running = false
+    if (inputAccessScanProcess.running) inputAccessScanProcess.running = false
+    if (inputAccessGrantProcess.running) inputAccessGrantProcess.running = false
   }
 
   IpcHandler {
@@ -728,6 +971,17 @@ Item {
         mouseDeviceName: root.mouseDeviceName,
         mouseDevicePath: root.mouseDevicePath,
         mouseDevices: root.mouseDeviceOptions,
+        inputAccessChecked: root.inputAccessChecked,
+        inputAccessMissing: root.inputAccessMissing,
+        inputAccessConfigured: root.inputAccessConfigured,
+        inputAccessActive: root.inputAccessActive,
+        inputAccessNeedsRelogin: root.inputAccessNeedsRelogin,
+        inputAccessUser: root.inputAccessUser,
+        keyboardDevicePath: root.keyboardDevicePath,
+        keyboardDevicePresent: root.keyboardDevicePresent,
+        mouseDevicePresent: root.mouseDevicePresent,
+        inputAccessMessage: root.inputAccessActionMessage,
+        inputAccessError: root.inputAccessActionError,
         mouseMessage: root.mouseLastMessage,
         mouseError: root.mouseLastError,
         message: root.lastMessage,

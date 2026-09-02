@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 source_root="$repo_dir/third_party/mouse-sounds"
-output_root="$repo_dir/mouse-sounds"
+output_root=${TYPETONE_MOUSE_OUTPUT_ROOT:-"$repo_dir/mouse-sounds"}
 
 command -v ffmpeg >/dev/null 2>&1 || {
   echo "ffmpeg is required to regenerate the TypeTone mouse sounds." >&2

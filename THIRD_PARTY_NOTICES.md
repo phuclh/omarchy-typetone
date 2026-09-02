@@ -14,7 +14,7 @@ identified separately below.
 
 TypeTone starts the `wayvibes` executable but does not copy or modify its
 source. Review the upstream project and its terms before installing, using, or
-redistributing it. At the time of TypeTone 1.3.2, the upstream repository does
+redistributing it. At the time of TypeTone 1.3.3, the upstream repository does
 not expose a root license file.
 
 ## Sound packs
@@ -48,4 +48,6 @@ under `mouse-sounds/` are derived from the following recordings:
 CC0 does not require attribution; TypeTone includes it to preserve provenance
 and thank the recordists. Exact source links, local filenames, and checksums are
 in [`third_party/mouse-sounds/README.md`](third_party/mouse-sounds/README.md).
-TypeTone's processing script is distributed under the MIT license.
+The repository includes checksum manifests and a verifier that reproduces all
+processed outputs from those sources. TypeTone's processing and verification
+scripts are distributed under the MIT license.

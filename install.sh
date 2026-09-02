@@ -67,6 +67,9 @@ TypeTone guided setup will:
 
 Omarchy plugins run as unsandboxed user code. Continue only if you trust and
 have reviewed TypeTone and Wayvibes.
+
+Wayvibes requires membership in the Linux input group. This lets applications
+running as your user read global keyboard and mouse events, not only TypeTone.
 EOF
 
 confirm "Continue with TypeTone setup?" || fail "cancelled"
@@ -177,7 +180,7 @@ fi
 echo
 echo "TypeTone setup is complete."
 if $needs_relogin; then
-  echo "Log out and back in once so TypeTone can access input devices."
+  echo "Restart your computer once so TypeTone can access input devices."
 else
   echo "TypeTone is ready in the Omarchy bar."
 fi

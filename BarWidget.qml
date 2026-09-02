@@ -31,6 +31,7 @@ BarWidget {
   property bool packPickerOpen: false
   property bool mousePackPickerOpen: false
   property bool mouseDevicePickerOpen: false
+  property bool restartConfirmOpen: false
   property string settingsPage: "keyboard"
 
   function packValue(option) {
@@ -138,10 +139,14 @@ BarWidget {
 
   function close() {
     closePickers()
+    restartConfirmOpen = false
     popupOpen = false
   }
 
-  onPopupOpenChanged: if (!popupOpen) closePickers()
+  onPopupOpenChanged: if (!popupOpen) {
+    closePickers()
+    restartConfirmOpen = false
+  }
 
   implicitWidth: statusIcon.implicitWidth + Style.space(14)
   implicitHeight: barSize
@@ -245,6 +250,163 @@ BarWidget {
       }
 
       PanelSeparator { foreground: root.bar.foreground }
+
+      BorderSurface {
+        id: inputAccessCard
+        width: parent.width
+        visible: root.wayvibesService && root.wayvibesService.inputAccessMissing
+        implicitHeight: inputAccessContent.implicitHeight + Style.space(20)
+        color: Color.popups.background
+        borderSpec: Border.flat(Color.urgent, Math.max(1, Style.spacing.hairline))
+        radius: Style.cornerRadius
+
+        Column {
+          id: inputAccessContent
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          anchors.leftMargin: Style.space(10)
+          anchors.rightMargin: Style.space(10)
+          spacing: Style.space(7)
+
+          Row {
+            width: parent.width
+            spacing: Style.space(7)
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.wayvibesService
+                && root.wayvibesService.inputAccessNeedsRelogin ? "󰍁" : "󰌾"
+              color: Color.urgent
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.icon
+            }
+
+            Text {
+              anchors.verticalCenter: parent.verticalCenter
+              width: parent.width - Style.space(34)
+              text: root.wayvibesService
+                ? root.wayvibesService.inputAccessTitle : "Input access required"
+              color: root.bar.foreground
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.body
+              font.bold: true
+            }
+          }
+
+          Text {
+            width: parent.width
+            textFormat: Text.PlainText
+            text: root.wayvibesService && root.wayvibesService.inputAccessNeedsRelogin
+              ? "Access was granted, but an older desktop session is still active. Restart your computer once, then TypeTone will start automatically."
+              : "TypeTone uses WayVibes to read global keyboard and mouse events. Granting access adds your account to the Linux input group."
+            color: Qt.darker(root.bar.foreground, 1.25)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+
+          Text {
+            width: parent.width
+            visible: root.wayvibesService
+              && !root.wayvibesService.inputAccessNeedsRelogin
+            textFormat: Text.PlainText
+            text: "Other applications running as your user could also read these input events."
+            color: Color.urgent
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.space(6)
+
+            Button {
+              width: root.wayvibesService
+                && root.wayvibesService.inputAccessNeedsRelogin
+                ? parent.width : (parent.width - parent.spacing) / 2
+              text: root.wayvibesService && root.wayvibesService.inputAccessNeedsRelogin
+                ? "Restart computer"
+                : (root.wayvibesService && root.wayvibesService.inputAccessGranting
+                  ? "Authorizing…" : "Grant access")
+              iconText: root.wayvibesService && root.wayvibesService.inputAccessNeedsRelogin
+                ? "󰜉" : (root.wayvibesService && root.wayvibesService.inputAccessGranting
+                  ? "󰑐" : "󰌾")
+              iconSpinning: root.wayvibesService
+                && root.wayvibesService.inputAccessGranting
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              bordered: true
+              enabled: root.wayvibesService
+                && !root.wayvibesService.inputAccessGranting
+              opacity: enabled ? 1 : 0.6
+              onClicked: if (root.wayvibesService) {
+                if (root.wayvibesService.inputAccessNeedsRelogin)
+                  root.restartConfirmOpen = true
+                else
+                  root.wayvibesService.requestInputAccess()
+              }
+            }
+
+            Button {
+              visible: root.wayvibesService
+                && !root.wayvibesService.inputAccessNeedsRelogin
+              width: (parent.width - parent.spacing) / 2
+              text: "Copy command"
+              iconText: "󰆏"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              bordered: true
+              enabled: root.wayvibesService
+                && !root.wayvibesService.inputAccessGranting
+              opacity: enabled ? 1 : 0.6
+              onClicked: if (root.wayvibesService)
+                root.wayvibesService.copyInputAccessCommand()
+            }
+          }
+
+          Text {
+            width: parent.width
+            visible: root.wayvibesService
+              && root.wayvibesService.inputAccessActionMessage !== ""
+            text: root.wayvibesService
+              ? root.wayvibesService.inputAccessActionMessage : ""
+            color: Qt.darker(root.bar.foreground, 1.25)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+
+          Text {
+            width: parent.width
+            visible: root.wayvibesService
+              && root.wayvibesService.inputAccessActionError !== ""
+            text: root.wayvibesService
+              ? root.wayvibesService.inputAccessActionError : ""
+            color: Color.urgent
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+        }
+
+        ConfirmDialog {
+          anchors.fill: parent
+          opened: root.restartConfirmOpen
+          z: 10
+          message: "Restart now to activate TypeTone? All open applications will be closed."
+          confirmText: "Restart"
+          background: Color.popups.background
+          foreground: root.bar.foreground
+          fontFamily: root.bar.fontFamily
+          onCanceled: root.restartConfirmOpen = false
+          onConfirmed: {
+            root.restartConfirmOpen = false
+            if (root.wayvibesService) root.wayvibesService.restartComputer()
+          }
+        }
+      }
 
       Row {
         width: parent.width
@@ -626,7 +788,8 @@ BarWidget {
 
       Text {
         width: parent.width
-        visible: root.wayvibesService && text !== ""
+        visible: root.wayvibesService && !root.wayvibesService.inputAccessMissing
+          && text !== ""
         text: !root.wayvibesService ? ""
           : (root.settingsPage === "mouse"
             ? root.wayvibesService.mouseLastError
